@@ -1,0 +1,10 @@
+{
+  "name": "QQBot-Plugin",
+  "type": "module",
+  "author": "TimeRainStarSky",
+  "dependencies": {
+    "qq-group-bot": "^0.0.6",
+    "qrcode": "^1.5.3",
+    "silk-wasm": "^2.0.2"
+  }
+}
