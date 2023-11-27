@@ -46,25 +46,42 @@ const adapter = new class QQBotAdapter {
     if (!Array.isArray(msg))
       msg = [msg]
     const msgs = []
+    const sendMsg = async msg => {
+      try {
+        msgs.push(await send(msg))
+      } catch (err) {
+        Bot.makeLog("error", `发送消息错误：${Bot.String(msg)}`)
+        logger.error(err)
+      }
+    }
+
+    let messages = []
     for (let i of msg) {
-      if (typeof i != "object")
+      if (typeof i == "object")
+        i = { ...i }
+      else
         i = { type: "text", text: i }
 
       switch (i.type) {
         case "text":
-        case "image":
-        case "video":
-        case "file":
         case "face":
+        case "at":
+        case "reply":
+        case "markdown":
+        case "button":
           break
         case "record":
           i.type = "audio"
           i.file = await this.makeSilk(i.file)
-          break
-        case "at":
-        case "reply":
-          continue
-        case "markdown":
+        case "image":
+        case "video":
+        case "file":
+          if (i.file)
+            i.file = await Bot.fileToUrl(i.file)
+          if (messages.length) {
+            await sendMsg(messages)
+            messages = []
+          }
           break
         case "node":
           msgs.push(...(await Bot.sendForwardMsg(msg => this.sendMsg(send, msg), i.data)))
@@ -72,9 +89,6 @@ const adapter = new class QQBotAdapter {
         default:
           i = { type: "text", data: { text: JSON.stringify(i) }}
       }
-
-      if (i.file)
-        i.file = await Bot.fileToUrl(i.file)
 
       if (i.type == "text" && i.text) {
         const match = i.text.match(this.toQRCodeRegExp)
@@ -84,12 +98,10 @@ const adapter = new class QQBotAdapter {
         }
       }
 
-      try {
-        msgs.push(await send(i))
-      } catch (err) {
-        logger.error(err)
-      }
+      messages.push(i)
     }
+
+    await sendMsg(messages)
     return msgs
   }
 
