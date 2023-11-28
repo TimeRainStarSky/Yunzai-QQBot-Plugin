@@ -42,7 +42,7 @@ const adapter = new class QQBotAdapter {
     return (await QRCode.toDataURL(data)).replace("data:image/png;base64,", "base64://")
   }
 
-  async sendMsg(send, msg) {
+  async sendMsg(data, send, msg) {
     if (!Array.isArray(msg))
       msg = [msg]
     const msgs = []
@@ -63,9 +63,11 @@ const adapter = new class QQBotAdapter {
         i = { type: "text", text: i }
 
       switch (i.type) {
+        case "at":
+          //i.user_id = i.qq.replace(`${data.self_id}:`, "")
+          continue
         case "text":
         case "face":
-        case "at":
         case "reply":
         case "markdown":
         case "button":
@@ -84,7 +86,7 @@ const adapter = new class QQBotAdapter {
           }
           break
         case "node":
-          msgs.push(...(await Bot.sendForwardMsg(msg => this.sendMsg(send, msg), i.data)))
+          msgs.push(...(await Bot.sendForwardMsg(msg => this.sendMsg(data, send, msg), i.data)))
           continue
         default:
           i = { type: "text", data: { text: JSON.stringify(i) }}
@@ -93,7 +95,7 @@ const adapter = new class QQBotAdapter {
       if (i.type == "text" && i.text) {
         const match = i.text.match(this.toQRCodeRegExp)
         if (match) for (const url of match) {
-          await this.sendMsg(send, segment.image(await this.makeQRCode(url)))
+          msgs.push(...(await this.sendMsg(data, send, segment.image(await this.makeQRCode(url)))))
           i.text = i.text.replace(url, "[链接(请扫码查看)]")
         }
       }
@@ -107,17 +109,17 @@ const adapter = new class QQBotAdapter {
 
   sendReplyMsg(data, msg, event) {
     Bot.makeLog("info", `发送回复消息：[${data.group_id ? `${data.group_id}, ` : ""}${data.user_id}] ${Bot.String(msg)}`, data.self_id)
-    return this.sendMsg(msg => event.reply(msg), msg)
+    return this.sendMsg(data, msg => event.reply(msg), msg)
   }
 
   sendFriendMsg(data, msg, event) {
     Bot.makeLog("info", `发送好友消息：[${data.user_id}] ${Bot.String(msg)}`, data.self_id)
-    return this.sendMsg(msg => data.bot.sdk.sendPrivateMessage(data.user_id, msg, event), msg)
+    return this.sendMsg(data, msg => data.bot.sdk.sendPrivateMessage(data.user_id, msg, event), msg)
   }
 
   sendGroupMsg(data, msg, event) {
     Bot.makeLog("info", `发送群消息：[${data.group_id}] ${Bot.String(msg)}`, data.self_id)
-    return this.sendMsg(msg => data.bot.sdk.sendGroupMessage(data.group_id, msg, event), msg)
+    return this.sendMsg(data, msg => data.bot.sdk.sendGroupMessage(data.group_id, msg, event), msg)
   }
 
   pickFriend(id, user_id) {
