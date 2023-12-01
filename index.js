@@ -71,6 +71,8 @@ const adapter = new class QQBotAdapter {
         case "reply":
         case "markdown":
         case "button":
+        case "ark":
+        case "embed":
           break
         case "record":
           i.type = "audio"
@@ -103,7 +105,8 @@ const adapter = new class QQBotAdapter {
       messages.push(i)
     }
 
-    await sendMsg(messages)
+    if (messages.length)
+      await sendMsg(messages)
     return msgs
   }
 
