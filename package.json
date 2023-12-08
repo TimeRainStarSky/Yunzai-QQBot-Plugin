@@ -5,6 +5,6 @@
   "dependencies": {
     "qq-group-bot": "1.0.0",
     "qrcode": "^1.5.3",
-    "silk-wasm": "^2.0.2"
+    "silk-wasm": "^3.1.0"
   }
 }

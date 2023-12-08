@@ -27,7 +27,7 @@ const adapter = new class QQBotAdapter {
     try {
       fs.writeFileSync(inputFile, await Bot.Buffer(file))
       await Bot.exec(`ffmpeg -i "${inputFile}" -f s16le -ar 48000 -ac 1 "${pcmFile}"`)
-      file = Buffer.from(await encodeSilk(fs.readFileSync(pcmFile), 48000))
+      file = Buffer.from((await encodeSilk(fs.readFileSync(pcmFile), 48000)).data)
     } catch (err) {
       logger.error(`silk 转码错误：${err}`)
     }
