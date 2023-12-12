@@ -90,6 +90,9 @@ const adapter = new class QQBotAdapter {
         case "node":
           msgs.push(...(await Bot.sendForwardMsg(msg => this.sendMsg(data, send, msg), i.data)))
           continue
+        case "raw":
+          i = i.data
+          break
         default:
           i = { type: "text", data: { text: JSON.stringify(i) }}
       }
