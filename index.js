@@ -42,13 +42,65 @@ const adapter = new class QQBotAdapter {
     return (await QRCode.toDataURL(data)).replace("data:image/png;base64,", "base64://")
   }
 
+  makeButton(data, button) {
+    const msg = {
+      id: String(Date.now()),
+      render_data: {
+        label: button.text,
+        visited_label: button.clicked_text,
+        style: 1,
+        ...button.render_data,
+      }
+    }
+
+    if (button.input) {
+      msg.action = {
+        type: 2,
+        permission: { type: 2 },
+        data: button.input,
+        enter: button.send,
+        ...button.action,
+      }
+    }
+
+    if (button.permission) {
+      if (button.permission == "admin") {
+        msg.action.permission.type = 1
+      } else {
+        msg.action.permission.type = 0
+        msg.action.permission.specify_user_ids = []
+        if (!Array.isArray(button.permission))
+          button.permission = [button.permission]
+        for (const id of button.permission)
+          msg.action.permission.specify_user_ids.push(id.replace(`${data.self_id}:`, ""))
+      }
+    }
+    return msg
+  }
+
+  makeButtons(data, button_square) {
+    const msgs = []
+    for (const button_row of button_square) {
+      const buttons = []
+      for (const button of button_row)
+        buttons.push(this.makeButton(data, button))
+      msgs.push({ type: "button", buttons })
+    }
+    return msgs
+  }
+
   async sendMsg(data, send, msg) {
     if (!Array.isArray(msg))
       msg = [msg]
-    const msgs = []
+    const rets = { message_id: [], data: [] }
     const sendMsg = async msg => {
       try {
-        msgs.push(await send(msg))
+        const ret = await send(msg)
+        if (ret) {
+          rets.data.push(ret)
+          if (ret.msg_id || ret.sendResult?.msg_id)
+            rets.message_id.push(ret.msg_id || ret.sendResult.msg_id)
+        }
       } catch (err) {
         Bot.makeLog("error", `发送消息错误：${Bot.String(msg)}`)
         logger.error(err)
@@ -69,8 +121,6 @@ const adapter = new class QQBotAdapter {
         case "text":
         case "face":
         case "reply":
-        case "markdown":
-        case "button":
         case "ark":
         case "embed":
           break
@@ -87,8 +137,20 @@ const adapter = new class QQBotAdapter {
             messages = []
           }
           break
+        case "markdown":
+          if (typeof i.data == "object")
+            i = { type: "markdown", ...i.data }
+          else
+            i = { type: "markdown", content: i.data }
+          break
+        case "button":
+          messages.push(...this.makeButtons(data, i.data))
+          continue
         case "node":
-          msgs.push(...(await Bot.sendForwardMsg(msg => this.sendMsg(data, send, msg), i.data)))
+          for (const ret of (await Bot.sendForwardMsg(msg => this.sendMsg(data, send, msg), i.data))) {
+            rets.data.push(...ret.data)
+            rets.message_id.push(...ret.message_id)
+          }
           continue
         case "raw":
           i = i.data
@@ -100,7 +162,9 @@ const adapter = new class QQBotAdapter {
       if (i.type == "text" && i.text) {
         const match = i.text.match(this.toQRCodeRegExp)
         if (match) for (const url of match) {
-          msgs.push(...(await this.sendMsg(data, send, segment.image(await this.makeQRCode(url)))))
+          const ret = await this.sendMsg(data, send, segment.image(await this.makeQRCode(url)))
+          rets.data.push(...ret.data)
+          rets.message_id.push(...ret.message_id)
           i.text = i.text.replace(url, "[链接(请扫码查看)]")
         }
       }
@@ -110,7 +174,7 @@ const adapter = new class QQBotAdapter {
 
     if (messages.length)
       await sendMsg(messages)
-    return msgs
+    return rets
   }
 
   sendReplyMsg(data, msg, event) {
