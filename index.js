@@ -4,6 +4,7 @@ import { config, configSave } from "./Model/config.js"
 import fs from "node:fs"
 import path from "node:path"
 import QRCode from "qrcode"
+import imageSize from "image-size"
 import { randomUUID } from "crypto"
 import { encode as encodeSilk } from "silk-wasm"
 import { Bot as QQBot } from "qq-group-bot"
@@ -40,6 +41,27 @@ const adapter = new class QQBotAdapter {
 
   async makeQRCode(data) {
     return (await QRCode.toDataURL(data)).replace("data:image/png;base64,", "base64://")
+  }
+
+  async makeRawMarkdownText(data) {
+    const match = data.match(this.toQRCodeRegExp)
+    if (match) for (const url of match) {
+      const img = await this.makeImage(await this.makeQRCode(url))
+      data = data.replace(url, `![${img.dec}](${img.url})`)
+    }
+    return data
+  }
+
+  async makeImage(file) {
+    const buffer = await Bot.Buffer(file)
+    if (!Buffer.isBuffer(buffer)) return {}
+
+    let url
+    if (file.match?.(/^https?:\/\//)) url = file
+    else url = await Bot.fileToUrl(buffer)
+
+    const size = imageSize(buffer)
+    return { dec: `图片 #${size.width}px #${size.height}px`, url }
   }
 
   makeButton(data, button) {
@@ -89,25 +111,182 @@ const adapter = new class QQBotAdapter {
     return msgs
   }
 
-  async sendMsg(data, send, msg) {
+  async makeRawMarkdownMsg(data, msg) {
     if (!Array.isArray(msg))
       msg = [msg]
-    const rets = { message_id: [], data: [] }
-    const sendMsg = async msg => {
-      try {
-        const ret = await send(msg)
-        if (ret) {
-          rets.data.push(ret)
-          if (ret.msg_id || ret.sendResult?.msg_id)
-            rets.message_id.push(ret.msg_id || ret.sendResult.msg_id)
-        }
-      } catch (err) {
-        Bot.makeLog("error", `发送消息错误：${Bot.String(msg)}`)
-        logger.error(err)
+    const messages = []
+    let content = ""
+    const button = []
+
+    for (let i of msg) {
+      if (typeof i == "object")
+        i = { ...i }
+      else
+        i = { type: "text", text: i }
+
+      switch (i.type) {
+        case "record":
+          i.type = "audio"
+          i.file = await this.makeSilk(i.file)
+        case "video":
+        case "file":
+          if (i.file) i.file = await Bot.fileToUrl(i.file)
+          messages.push(i)
+          break
+        case "at":
+          if (i.qq == "all")
+            content += "@everyone"
+          else
+            content += `<@${i.qq.replace(`${data.self_id}:`, "")}>`
+          break
+        case "text":
+          content += await this.makeRawMarkdownText(i.text)
+          break
+        case "image": {
+          const { dec, url } = await this.makeImage(i.file)
+          content += `![${dec}](${url})`
+          break
+        } case "markdown":
+          content += i.data
+          break
+        case "button":
+          button.push(...this.makeButtons(data, i.data))
+          break
+        case "face":
+        case "reply":
+          break
+        case "node":
+          for (const { message } of i.data)
+            messages.push(...(await this.makeRawMarkdownMsg(data, message)))
+          continue
+        case "raw":
+          messages.push(i.data)
+          break
+        default:
+          content += await this.makeRawMarkdownText(JSON.stringify(i))
       }
     }
 
-    let messages = []
+    if (content)
+      messages.unshift([{ type: "markdown", content }, ...button])
+    return messages
+  }
+
+  makeMarkdownTemplate(data, template) {
+    const params = []
+    for (const i of ["text_start", "img_dec", "img_url", "text_end"])
+    if (template[i]) params.push({ key: i, values: [template[i]] })
+    return {
+      type: "markdown",
+      custom_template_id: config.markdown[data.self_id],
+      params,
+    }
+  }
+
+  async makeMarkdownMsg(data, msg) {
+    if (!Array.isArray(msg))
+      msg = [msg]
+    const messages = []
+    let content = ""
+    let button = []
+    let template = {}
+
+    for (let i of msg) {
+      if (typeof i == "object")
+        i = { ...i }
+      else
+        i = { type: "text", text: i }
+
+      switch (i.type) {
+        case "record":
+          i.type = "audio"
+          i.file = await this.makeSilk(i.file)
+        case "video":
+        case "file":
+          if (i.file) i.file = await Bot.fileToUrl(i.file)
+          messages.push(i)
+          break
+        case "at":
+          if (i.qq == "all")
+            content += "@everyone"
+          else
+            content += `<@${i.qq.replace(`${data.self_id}:`, "")}>`
+          break
+        case "text":
+          content += i.text
+          break
+        case "image": {
+          const { dec, url } = await this.makeImage(i.file)
+
+          if (template.img_dec && template.img_url) {
+            template.text_end = content
+            messages.push([
+              this.makeMarkdownTemplate(data, template),
+              ...button,
+            ])
+            content = ""
+            button = []
+          }
+
+          template = {
+            text_start: content,
+            img_dec: dec,
+            img_url: url,
+          }
+          content = ""
+          break
+        } case "markdown":
+          if (typeof i.data == "object")
+            messages.push({ type: "markdown", ...i.data })
+          else
+            messages.push({ type: "markdown", content: i.data })
+          break
+        case "button":
+          button.push(...this.makeButtons(data, i.data))
+          break
+        case "face":
+        case "reply":
+          break
+        case "node":
+          for (const { message } of i.data)
+            messages.push(...(await this.makeRawMarkdownMsg(data, message)))
+          continue
+        case "raw":
+          messages.push(i.data)
+          break
+        default:
+          content += await this.makeRawMarkdownText(JSON.stringify(i))
+      }
+
+      if (content) {
+        content = content.replace(/\n/g, "　")
+        const match = content.match(this.toQRCodeRegExp)
+        if (match) for (const url of match) {
+          const msg = segment.image(await Bot.fileToUrl(await this.makeQRCode(url)))
+          messages.push(msg)
+          content = content.replace(url, "[链接(请扫码查看)]")
+        }
+      }
+    }
+
+    if (template.img_dec && template.img_url) {
+      template.text_end = content
+    } else if (content) {
+      template = { text_start: content, text_end: "" }
+    }
+    if (template.text_start || template.text_end || (template.img_dec && template.img_url))
+      messages.push([
+        this.makeMarkdownTemplate(data, template),
+        ...button,
+      ])
+    return messages
+  }
+
+  async makeMsg(data, msg) {
+    if (!Array.isArray(msg))
+      msg = [msg]
+    const messages = []
+    let message = []
     for (let i of msg) {
       if (typeof i == "object")
         i = { ...i }
@@ -132,9 +311,9 @@ const adapter = new class QQBotAdapter {
         case "file":
           if (i.file)
             i.file = await Bot.fileToUrl(i.file)
-          if (messages.length) {
-            await sendMsg(messages)
-            messages = []
+          if (message.length) {
+            messages.push(message)
+            message = []
           }
           break
         case "markdown":
@@ -144,13 +323,11 @@ const adapter = new class QQBotAdapter {
             i = { type: "markdown", content: i.data }
           break
         case "button":
-          messages.push(...this.makeButtons(data, i.data))
+          message.push(...this.makeButtons(data, i.data))
           continue
         case "node":
-          for (const ret of (await Bot.sendForwardMsg(msg => this.sendMsg(data, send, msg), i.data))) {
-            rets.data.push(...ret.data)
-            rets.message_id.push(...ret.message_id)
-          }
+          for (const { message } of i.data)
+            messages.push(...(await this.makeMsg(data, message)))
           continue
         case "raw":
           i = i.data
@@ -162,18 +339,57 @@ const adapter = new class QQBotAdapter {
       if (i.type == "text" && i.text) {
         const match = i.text.match(this.toQRCodeRegExp)
         if (match) for (const url of match) {
-          const ret = await this.sendMsg(data, send, segment.image(await this.makeQRCode(url)))
-          rets.data.push(...ret.data)
-          rets.message_id.push(...ret.message_id)
+          const msg = segment.image(await Bot.fileToUrl(await this.makeQRCode(url)))
+          if (message.length) {
+            messages.push(message)
+            message = []
+          }
+          message.push(msg)
           i.text = i.text.replace(url, "[链接(请扫码查看)]")
         }
       }
 
-      messages.push(i)
+      message.push(i)
     }
 
-    if (messages.length)
-      await sendMsg(messages)
+    if (message.length)
+      messages.push(message)
+    return messages
+  }
+
+  async sendMsg(data, send, msg) {
+    const rets = { message_id: [], data: [] }
+    let msgs
+    if (config.markdown[data.self_id]) {
+      if (config.markdown[data.self_id] == "raw") {
+        msgs = await this.makeRawMarkdownMsg(data, msg)
+      } else {
+        let needMd = false
+        if (Array.isArray(msg)) for (const i of msg)
+          if (typeof i == "object" && i.type == "button") {
+            needMd = true
+            break
+          }
+        if (needMd)
+          msgs = await this.makeMarkdownMsg(data, msg)
+        else
+          msgs = await this.makeMsg(data, msg)
+      }
+    } else {
+      msgs = await this.makeMsg(data, msg)
+    }
+
+    for (const i of msgs) try {
+      const ret = await send(i)
+      if (ret) {
+        rets.data.push(ret)
+        if (ret.msg_id || ret.sendResult?.msg_id)
+          rets.message_id.push(ret.msg_id || ret.sendResult.msg_id)
+      }
+    } catch (err) {
+      Bot.makeLog("error", `发送消息错误：${Bot.String(msg)}`)
+      logger.error(err)
+    }
     return rets
   }
 
@@ -380,6 +596,11 @@ export class QQBotAdapter extends plugin {
           reg: "^#[Qq]+[Bb]ot设置[0-9]+:[0-9]+:.+:.+:[01]:[01]$",
           fnc: "Token",
           permission: config.permission,
+        },
+        {
+          reg: "^#[Qq]+[Bb]ot[Mm](ark)?[Dd](own)?[0-9]+:",
+          fnc: "Markdown",
+          permission: config.permission,
         }
       ]
     })
@@ -403,6 +624,15 @@ export class QQBotAdapter extends plugin {
         return false
       }
     }
+    configSave(config)
+  }
+
+  Markdown() {
+    let token = this.e.msg.replace(/^#[Qq]+[Bb]ot[Mm](ark)?[Dd](own)?/, "").trim().split(":")
+    const bot_id = token.shift()
+    token = token.join(":")
+    this.reply(`Bot ${bot_id} Markdown 模板已设置为 ${token}`, true)
+    config.markdown[bot_id] = token
     configSave(config)
   }
 }
