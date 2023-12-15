@@ -75,7 +75,7 @@ const adapter = new class QQBotAdapter {
       }
     }
 
-    if (button.input) {
+    if (button.input)
       msg.action = {
         type: 2,
         permission: { type: 2 },
@@ -83,7 +83,13 @@ const adapter = new class QQBotAdapter {
         enter: button.send,
         ...button.action,
       }
-    }
+    else if (button.link)
+      msg.action = {
+        type: 0,
+        permission: { type: 2 },
+        data: button.link,
+        ...button.action,
+      }
 
     if (button.permission) {
       if (button.permission == "admin") {
