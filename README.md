@@ -31,10 +31,37 @@ TRSS-Yunzai QQBot 适配器 插件
 #QQBot设置114:514:1919:810:1:1
 ```
 
+## 高阶能力
+
+<details><summary>Markdown 消息</summary>
+
+高阶能力 → 消息模板 → 添加 Markdown 模板
+
+模板名称：图文消息  
+使用场景：发送图文混排消息  
+Markdown 源码：
+
+```
+{{.text_start}}![{{.img_dec}}]({{.img_url}}){{.text_end}}
+```
+
+配置模板参数
+| 模板参数 | 参数示例 |
+| - | - |
+| text_start | 开头文字 |
+| img_dec | 图片 |
+| img_url | https://qqminiapp.cdn-go.cn/open-platform/11d80dc9/img/robot.b167c62c.png |
+| text_end | 结束文字 |
+
+保存 → 提交审核 → 审核完成后，输入 `#QQBotMD机器人QQ号:模板ID`
+
+</details>
+
 ## 使用教程
 
 - #QQBot账号
 - #QQBot设置 + `机器人QQ号:AppID:Token:AppSecret:是否群Bot:是否频道私域`（是1 否0）
+- #QQBotMD + `机器人QQ号:模板ID`
 
 - 注意：
 1. 需要公网地址，使用浏览器打开 url，后台日志应显示访问请求

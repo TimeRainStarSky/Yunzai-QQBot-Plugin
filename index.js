@@ -572,15 +572,9 @@ const adapter = new class QQBotAdapter {
 
     await Bot[id].login()
 
-    Bot[id].sdk.logger = {
-      trace: log => logger.trace(`${logger.blue(`[${id}]`)} ${log}`),
-      debug: log => logger.debug(`${logger.blue(`[${id}]`)} ${log}`),
-      info: log => logger.info(`${logger.blue(`[${id}]`)} ${log}`),
-      mark: log => logger.mark(`${logger.blue(`[${id}]`)} ${log}`),
-      warn: log => logger.warn(`${logger.blue(`[${id}]`)} ${log}`),
-      error: log => logger.error(`${logger.blue(`[${id}]`)} ${log}`),
-      fatal: log => logger.fatal(`${logger.blue(`[${id}]`)} ${log}`),
-    }
+    Bot[id].sdk.logger = {}
+    for (const i of ["trace", "debug", "info", "mark", "warn", "error", "fatal"])
+      Bot[id].sdk.logger[i] = (...args) => Bot.makeLog(i, args, id)
 
     Bot[id].sdk.on("message.private", event => this.makeFriendMessage(id, event))
     Bot[id].sdk.on("message.group", event => this.makeGroupMessage(id, event))
