@@ -5,7 +5,7 @@ import fs from "node:fs"
 import path from "node:path"
 import QRCode from "qrcode"
 import imageSize from "image-size"
-import { randomUUID } from "crypto"
+import { randomUUID } from "node:crypto"
 import { encode as encodeSilk } from "silk-wasm"
 import { Bot as QQBot } from "qq-group-bot"
 
@@ -66,12 +66,12 @@ const adapter = new class QQBotAdapter {
 
   makeButton(data, button) {
     const msg = {
-      id: String(Date.now()),
+      id: randomUUID(),
       render_data: {
         label: button.text,
         visited_label: button.clicked_text,
         style: 1,
-        ...button.render_data,
+        ...button.QQBot?.render_data,
       }
     }
 
@@ -81,15 +81,24 @@ const adapter = new class QQBotAdapter {
         permission: { type: 2 },
         data: button.input,
         enter: button.send,
-        ...button.action,
+        ...button.QQBot?.action,
+      }
+    else if (button.callback)
+      msg.action = {
+        type: 2,
+        permission: { type: 2 },
+        data: button.callback,
+        enter: true,
+        ...button.QQBot?.action,
       }
     else if (button.link)
       msg.action = {
         type: 0,
         permission: { type: 2 },
         data: button.link,
-        ...button.action,
+        ...button.QQBot?.action,
       }
+    else return false
 
     if (button.permission) {
       if (button.permission == "admin") {
@@ -110,8 +119,10 @@ const adapter = new class QQBotAdapter {
     const msgs = []
     for (const button_row of button_square) {
       const buttons = []
-      for (const button of button_row)
-        buttons.push(this.makeButton(data, button))
+      for (let button of button_row) {
+        button = this.makeButton(data, button)
+        if (button) buttons.push(button)
+      }
       msgs.push({ type: "button", buttons })
     }
     return msgs
