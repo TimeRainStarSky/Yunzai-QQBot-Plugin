@@ -189,8 +189,13 @@ const adapter = new class QQBotAdapter {
 
     if (content)
       messages.unshift([{ type: "markdown", content }, ...button])
-    if (reply) for (const i of messages)
-      i.unshift(reply)
+
+    if (reply) for (const i in messages) {
+      if (Array.isArray(messages[i]))
+        messages[i].unshift(reply)
+      else
+        messages[i] = [reply, messages[i]]
+    }
     return messages
   }
 
@@ -243,10 +248,7 @@ const adapter = new class QQBotAdapter {
 
           if (template.img_dec && template.img_url) {
             template.text_end = content
-            messages.push([
-              this.makeMarkdownTemplate(data, template),
-              ...button,
-            ])
+            messages.push(this.makeMarkdownTemplate(data, template))
             content = ""
             button = []
           }
@@ -284,7 +286,7 @@ const adapter = new class QQBotAdapter {
       }
 
       if (content) {
-        content = content.replace(/\n/g, "\r")
+        content = content.replace(/\n/g, "　")
         const match = content.match(this.toQRCodeRegExp)
         if (match) for (const url of match) {
           const msg = segment.image(await Bot.fileToUrl(await this.makeQRCode(url)))
@@ -294,16 +296,22 @@ const adapter = new class QQBotAdapter {
       }
     }
 
-    if (template.img_dec && template.img_url) {
+    if (template.img_dec && template.img_url)
       template.text_end = content
-    } else if (content) {
+    else if (content)
       template = { text_start: content, text_end: "" }
-    }
+
     if (template.text_start || template.text_end || (template.img_dec && template.img_url))
-      messages.push([
-        this.makeMarkdownTemplate(data, template),
-        ...button,
-      ])
+      messages.push(this.makeMarkdownTemplate(data, template))
+
+    for (const i in messages)
+      if (!Array.isArray(messages[i]))
+        messages[i] = [messages[i]]
+
+    if (button.length) for (const i of messages)
+      if (i[0].type == "markdown")
+        i.push(...button)
+
     if (reply) for (const i of messages)
       i.unshift(reply)
     return messages
