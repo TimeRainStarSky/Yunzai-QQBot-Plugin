@@ -286,7 +286,7 @@ const adapter = new class QQBotAdapter {
       }
 
       if (content) {
-        content = content.replace(/\n/g, "　")
+        content = content.replace(/\n/g, "\r")
         const match = content.match(this.toQRCodeRegExp)
         if (match) for (const url of match) {
           const msg = segment.image(await Bot.fileToUrl(await this.makeQRCode(url)))
@@ -420,15 +420,16 @@ const adapter = new class QQBotAdapter {
     }
 
     for (const i of msgs) try {
+      Bot.makeLog("debug", ["发送消息", i], data.self_id)
       const ret = await send(i)
+      Bot.makeLog("debug", ["发送消息返回", ret], data.self_id)
       if (ret) {
         rets.data.push(ret)
         if (ret.msg_id || ret.sendResult?.msg_id)
           rets.message_id.push(ret.msg_id || ret.sendResult.msg_id)
       }
     } catch (err) {
-      Bot.makeLog("error", `发送消息错误：${Bot.String(msg)}`)
-      logger.error(err)
+      Bot.makeLog("error", [`发送消息错误：${Bot.String(msg)}\n`, err], data.self_id)
     }
     return rets
   }
@@ -493,7 +494,7 @@ const adapter = new class QQBotAdapter {
 
   makeMessage(id, event) {
     const data = {
-      event,
+      raw: event,
       bot: Bot[id],
       self_id: id,
       post_type: event.post_type,
@@ -526,7 +527,7 @@ const adapter = new class QQBotAdapter {
     data.message_type = "group"
     data.bot.gl.set(data.group_id, {
       group_id: data.group_id,
-      group_openid: data.event.group_openid,
+      group_openid: event.group_openid,
     })
     data.reply = msg => this.sendReplyMsg(data, msg, event)
 
