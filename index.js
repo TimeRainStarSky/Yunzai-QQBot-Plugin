@@ -403,36 +403,32 @@ const adapter = new class QQBotAdapter {
   async sendMsg(data, send, msg) {
     const rets = { message_id: [], data: [] }
     let msgs
+
+    const sendMsg = async () => { for (const i of msgs) try {
+      Bot.makeLog("debug", ["发送消息", i], data.self_id)
+      const ret = await send(i)
+      Bot.makeLog("debug", ["发送消息返回", ret], data.self_id)
+
+      rets.data.push(ret)
+      if (ret.msg_id || ret.sendResult?.msg_id)
+        rets.message_id.push(ret.msg_id || ret.sendResult.msg_id)
+    } catch (err) {
+      Bot.makeLog("error", [`发送消息错误：${Bot.String(i)}\n`, err], data.self_id)
+      return false
+    }}
+
     if (config.markdown[data.self_id]) {
-      if (config.markdown[data.self_id] == "raw") {
+      if (config.markdown[data.self_id] == "raw")
         msgs = await this.makeRawMarkdownMsg(data, msg)
-      } else {
-        /*let needMd = false
-        if (Array.isArray(msg)) for (const i of msg)
-          if (typeof i == "object" && i.type == "button") {
-            needMd = true
-            break
-          }
-        if (needMd)*/
-          msgs = await this.makeMarkdownMsg(data, msg)
-        /*else
-          msgs = await this.makeMsg(data, msg)*/
-      }
+      else
+        msgs = await this.makeMarkdownMsg(data, msg)
     } else {
       msgs = await this.makeMsg(data, msg)
     }
 
-    for (const i of msgs) try {
-      Bot.makeLog("debug", ["发送消息", i], data.self_id)
-      const ret = await send(i)
-      Bot.makeLog("debug", ["发送消息返回", ret], data.self_id)
-      if (ret) {
-        rets.data.push(ret)
-        if (ret.msg_id || ret.sendResult?.msg_id)
-          rets.message_id.push(ret.msg_id || ret.sendResult.msg_id)
-      }
-    } catch (err) {
-      Bot.makeLog("error", [`发送消息错误：${Bot.String(msg)}\n`, err], data.self_id)
+    if (await sendMsg() === false) {
+      msgs = await this.makeMsg(data, msg)
+      await sendMsg()
     }
     return rets
   }
