@@ -67,13 +67,13 @@ const adapter = new class QQBotAdapter {
     return { dec: `图片 #${size.width}px #${size.height}px`, url }
   }
 
-  makeButton(data, button) {
+  makeButton(data, button, style) {
     const msg = {
       id: randomUUID(),
       render_data: {
         label: button.text,
         visited_label: button.clicked_text,
-        style: 1,
+        style,
         ...button.QQBot?.render_data,
       }
     }
@@ -120,13 +120,17 @@ const adapter = new class QQBotAdapter {
 
   makeButtons(data, button_square) {
     const msgs = []
+    const random = Math.floor(Math.random()*2)
     for (const button_row of button_square) {
+      let column = 0
       const buttons = []
       for (let button of button_row) {
-        button = this.makeButton(data, button)
+        button = this.makeButton(data, button,
+          (random+msgs.length+buttons.length)%2)
         if (button) buttons.push(button)
       }
-      msgs.push({ type: "button", buttons })
+      if (buttons.length)
+        msgs.push({ type: "button", buttons })
     }
     return msgs
   }
