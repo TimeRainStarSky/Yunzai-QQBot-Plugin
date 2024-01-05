@@ -46,9 +46,10 @@ const adapter = new class QQBotAdapter {
     return (await QRCode.toDataURL(data)).replace("data:image/png;base64,", "base64://")
   }
 
-  async makeRawMarkdownText(data) {
+  async makeRawMarkdownText(data, button) {
     const match = data.match(this.toQRCodeRegExp)
     if (match) for (const url of match) {
+      button.push(...this.makeButtons(data, [[{ text: url, link: url }]]))
       const img = await this.makeImage(await this.makeQRCode(url))
       data = data.replace(url, `![${img.dec}](${img.url})`)
     }
@@ -165,7 +166,7 @@ const adapter = new class QQBotAdapter {
             content += `<@${i.qq.replace(`${data.self_id}${this.sep}`, "")}>`
           break
         case "text":
-          content += await this.makeRawMarkdownText(i.text)
+          content += await this.makeRawMarkdownText(i.text, button)
           break
         case "image": {
           const { dec, url } = await this.makeImage(i.file)
@@ -190,7 +191,7 @@ const adapter = new class QQBotAdapter {
           messages.push(i.data)
           break
         default:
-          content += await this.makeRawMarkdownText(JSON.stringify(i))
+          content += await this.makeRawMarkdownText(JSON.stringify(i), button)
       }
     }
 
@@ -296,9 +297,8 @@ const adapter = new class QQBotAdapter {
         content = content.replace(/\n/g, "\r")
         const match = content.match(this.toQRCodeRegExp)
         if (match) for (const url of match) {
-          const msg = segment.image(await Bot.fileToUrl(await this.makeQRCode(url)))
-          messages.push(msg)
-          content = content.replace(url, "[链接(请扫码查看)]")
+          button.push(...this.makeButtons(data, [[{ text: url, link: url }]]))
+          content = content.replace(url, "[链接(请点击按钮查看)]")
         }
       }
     }
