@@ -155,9 +155,12 @@ const adapter = new class QQBotAdapter {
           i.type = "audio"
           i.file = await this.makeSilk(i.file)
         case "video":
-        case "file":
           if (i.file) i.file = await Bot.fileToUrl(i.file)
           messages.push(i)
+          break
+        case "file":
+          if (i.file) i.file = await Bot.fileToUrl(i.file, i)
+          content += await this.makeRawMarkdownText(`文件：${i.file}`, button)
           break
         case "at":
           if (i.qq == "all")
@@ -238,9 +241,13 @@ const adapter = new class QQBotAdapter {
           i.type = "audio"
           i.file = await this.makeSilk(i.file)
         case "video":
-        case "file":
           if (i.file) i.file = await Bot.fileToUrl(i.file)
           messages.push(i)
+          break
+        case "file":
+          if (i.file) i.file = await Bot.fileToUrl(i.file, i)
+          button.push(...this.makeButtons(data, [[{ text: i.name || i.file, link: i.file }]]))
+          content += "[文件(请点击按钮查看)]"
           break
         case "at":
           if (i.qq == "all")
@@ -350,13 +357,15 @@ const adapter = new class QQBotAdapter {
           i.file = await this.makeSilk(i.file)
         case "image":
         case "video":
-        case "file":
-          if (i.file)
-            i.file = await Bot.fileToUrl(i.file)
+          if (i.file) i.file = await Bot.fileToUrl(i.file)
           if (message.length) {
             messages.push(message)
             message = []
           }
+          break
+        case "file":
+          if (i.file) i.file = await Bot.fileToUrl(i.file, i)
+          i = { type: "text", text: `文件：${i.file}` }
           break
         case "reply":
           reply = i
@@ -378,7 +387,7 @@ const adapter = new class QQBotAdapter {
           i = i.data
           break
         default:
-          i = { type: "text", data: { text: JSON.stringify(i) }}
+          i = { type: "text", text: JSON.stringify(i) }
       }
 
       if (i.type == "text" && i.text) {
