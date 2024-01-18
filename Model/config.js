@@ -9,6 +9,7 @@ const config = {
   tips: "",
   permission: "master",
   toQRCode: true,
+  toCallback: true,
   markdown: {},
   bot: {
     sandbox: false,

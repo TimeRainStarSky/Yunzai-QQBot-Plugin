@@ -88,15 +88,33 @@ const adapter = new class QQBotAdapter {
         enter: button.send,
         ...button.QQBot?.action,
       }
-    else if (button.callback)
-      msg.action = {
-        type: 2,
-        permission: { type: 2 },
-        data: button.callback,
-        enter: true,
-        ...button.QQBot?.action,
+    else if (button.callback) {
+      if (config.toCallback) {
+        msg.action = {
+          type: 1,
+          permission: { type: 2 },
+          ...button.QQBot?.action,
+        }
+        if (!Array.isArray(data._ret_id))
+          data._ret_id = []
+        data.bot.callback[msg.id] = {
+          id: data.message_id,
+          user_id: data.user_id,
+          group_id: data.group_id,
+          message: button.callback,
+          message_id: data._ret_id,
+        }
+        setTimeout(() => delete data.bot.callback[msg.id], 300000)
+      } else {
+        msg.action = {
+          type: 2,
+          permission: { type: 2 },
+          data: button.callback,
+          enter: true,
+          ...button.QQBot?.action,
+        }
       }
-    else if (button.link)
+    } else if (button.link)
       msg.action = {
         type: 0,
         permission: { type: 2 },
@@ -199,8 +217,17 @@ const adapter = new class QQBotAdapter {
       }
     }
 
-    if (content)
-      messages.unshift([{ type: "markdown", content }, ...button])
+    if (content) messages.unshift([
+      { type: "markdown", content },
+      ...button.splice(0,5),
+    ])
+
+    while (button.length) {
+      messages.push([
+        { type: "markdown", content: " " },
+        ...button.splice(0,5),
+      ])
+    }
 
     if (reply) for (const i in messages) {
       if (Array.isArray(messages[i]))
@@ -314,7 +341,7 @@ const adapter = new class QQBotAdapter {
     if (template.img_dec && template.img_url)
       template.text_end = content
     else if (content)
-      template = { text_start: content, text_end: "" }
+      template = { text_start: content }
 
     if (template.text_start || template.text_end || (template.img_dec && template.img_url))
       messages.push(this.makeMarkdownTemplate(data, template))
@@ -323,9 +350,19 @@ const adapter = new class QQBotAdapter {
       if (!Array.isArray(messages[i]))
         messages[i] = [messages[i]]
 
-    if (button.length) for (const i of messages)
-      if (i[0].type == "markdown")
-        i.push(...button)
+    if (button.length) {
+      for (const i of messages) {
+        if (i[0].type == "markdown")
+          i.push(...button.splice(0,5))
+        if (!button.length) break
+      }
+      while (button.length) {
+        messages.push([
+          this.makeMarkdownTemplate(data, { text_start: " " }),
+          ...button.splice(0,5),
+        ])
+      }
+    }
 
     if (reply) for (const i of messages)
       i.unshift(reply)
@@ -424,8 +461,8 @@ const adapter = new class QQBotAdapter {
       Bot.makeLog("debug", ["发送消息返回", ret], data.self_id)
 
       rets.data.push(ret)
-      if (ret.msg_id || ret.sendResult?.msg_id)
-        rets.message_id.push(ret.msg_id || ret.sendResult.msg_id)
+      if (ret.id)
+        rets.message_id.push(ret.id)
     } catch (err) {
       Bot.makeLog("error", [`发送消息错误：${Bot.String(i)}\n`, err], data.self_id)
       return false
@@ -444,12 +481,10 @@ const adapter = new class QQBotAdapter {
       msgs = await this.makeMsg(data, msg)
       await sendMsg()
     }
-    return rets
-  }
 
-  sendReplyMsg(data, msg, event) {
-    Bot.makeLog("info", `发送回复消息：[${data.group_id ? `${data.group_id}, ` : ""}${data.user_id}] ${Bot.String(msg)}`, data.self_id)
-    return this.sendMsg(data, msg => event.reply(msg), msg)
+    if (Array.isArray(data._ret_id))
+      data._ret_id.push(...rets.message_id)
+    return rets
   }
 
   sendFriendMsg(data, msg, event) {
@@ -502,6 +537,7 @@ const adapter = new class QQBotAdapter {
       sendMsg: msg => this.sendGroupMsg(i, msg),
       sendFile: (file, name) => this.sendGroupMsg(i, segment.file(file, name)),
       pickMember: user_id => this.pickMember(id, group_id, user_id),
+      getMemberMap: () => i.bot.gml.get(group_id),
     }
   }
 
@@ -511,45 +547,138 @@ const adapter = new class QQBotAdapter {
       bot: Bot[id],
       self_id: id,
       post_type: event.post_type,
+      message_type: event.message_type,
       message_id: event.message_id,
       get user_id() { return this.sender.user_id },
-      group_id: `${id}${this.sep}${event.group_id}`,
-      sender: {
-        user_id: `${id}${this.sep}${event.sender.user_id}`,
-      },
+      sender: event.sender,
       message: event.message,
       raw_message: event.raw_message,
     }
-    data.bot.fl.set(data.user_id, data.sender)
 
-    return data
-  }
-
-  makeFriendMessage(id, event) {
-    const data = this.makeMessage(id, event)
-    data.message_type = "private"
-    delete data.group_id
-
-    Bot.makeLog("info", `好友消息：[${data.user_id}] ${data.raw_message}`, data.self_id)
-    Bot.em(`${data.post_type}.${data.message_type}`, data)
-  }
-
-  makeGroupMessage(id, event) {
-    const data = this.makeMessage(id, event)
-    data.message_type = "group"
-    data.bot.gl.set(data.group_id, {
-      group_id: data.group_id,
-    })
-    let gml = data.bot.gml.get(data.group_id)
-    if (!gml) {
-      gml = new Map
-      data.bot.gml.set(data.group_id, gml)
+    switch (data.message_type) {
+      case "private":
+        data.sender.user_id = `${id}${this.sep}${event.user_id}`
+        Bot.makeLog("info", `好友消息：[${data.user_id}] ${data.raw_message}`, data.self_id)
+        data.reply = msg => this.sendFriendMsg({ ...data, user_id: event.user_id }, msg, { id: data.message_id })
+        break
+      case "group":
+        data.sender.user_id = `${id}${this.sep}${event.user_id}`
+        data.group_id = `${id}${this.sep}${event.group_id}`
+        Bot.makeLog("info", `群消息：[${data.group_id}, ${data.user_id}] ${data.raw_message}`, data.self_id)
+        data.reply = msg => this.sendGroupMsg({ ...data, group_id: event.group_id }, msg, { id: data.message_id })
+        break
+      case "direct":
+      case "guild":
+        return
+        break
+      default:
+        Bot.makeLog("warn", ["未知消息", event], id)
+        return
     }
-    gml.set(data.user_id, data.sender)
-    data.reply = msg => this.sendReplyMsg(data, msg, event)
 
-    Bot.makeLog("info", `群消息：[${data.group_id}, ${data.user_id}] ${data.raw_message}`, data.self_id)
+    data.bot.fl.set(data.user_id, data.sender)
+    if (data.group_id) {
+      data.bot.gl.set(data.group_id, {
+        group_id: data.group_id,
+      })
+      let gml = data.bot.gml.get(data.group_id)
+      if (!gml) {
+        gml = new Map
+        data.bot.gml.set(data.group_id, gml)
+      }
+      gml.set(data.user_id, data.sender)
+    }
+
     Bot.em(`${data.post_type}.${data.message_type}`, data)
+  }
+
+  makeCallback(id, event) {
+    const data = {
+      raw: event,
+      bot: Bot[id],
+      self_id: id,
+      post_type: "message",
+      message_id: event.notice_id,
+      message_type: event.notice_type,
+      get user_id() { return this.sender.user_id },
+      sender: { user_id: `${id}${this.sep}${event.operator_id}` },
+      message: [],
+      raw_message: "",
+    }
+
+    const callback = data.bot.callback[event.data?.resolved?.button_id]
+    if (callback) {
+      if (!event.group_id && callback.group_id)
+        event.group_id = callback.group_id
+      data.message_id = callback.id
+      if (callback.message_id.length) {
+        for (const id of callback.message_id)
+          data.message.push({ type: "reply", id })
+        data.raw_message += `[回复：${callback.message_id}]`
+      }
+      data.message.push({ type: "text", text: callback.message })
+      data.raw_message += callback.message
+    } else {
+      if (event.data?.resolved?.button_id) {
+        data.message.push({ type: "reply", id: event.data?.resolved?.button_id })
+        data.raw_message += `[回复：${event.data?.resolved?.button_id}]`
+      }
+      if (event.data?.resolved?.button_data) {
+        data.message.push({ type: "text", text: event.data?.resolved?.button_data })
+        data.raw_message += event.data?.resolved?.button_data
+      } else {
+        event.reply(1)
+      }
+    }
+    event.reply(0)
+
+    switch (data.message_type) {
+      case "friend":
+        Bot.makeLog("info", [`好友按钮点击事件：[${data.user_id}]`, data.raw_message], data.self_id)
+        data.reply = msg => this.sendFriendMsg({ ...data, user_id: event.operator_id }, msg, { id: data.message_id })
+        break
+      case "group":
+        data.group_id = `${id}${this.sep}${event.group_id}`
+        Bot.makeLog("info", [`群按钮点击事件：[${data.group_id}, ${data.user_id}]`, data.raw_message], data.self_id)
+        data.reply = msg => this.sendGroupMsg({ ...data, group_id: event.group_id }, msg, { id: data.message_id })
+        break
+      case "direct":
+      case "guild":
+        break
+      default:
+        Bot.makeLog("warn", ["未知按钮点击事件", event], data.self_id)
+    }
+
+    Bot.em(`${data.post_type}.${data.message_type}`, data)
+  }
+
+  makeNotice(id, event) {
+    const data = {
+      raw: event,
+      bot: Bot[id],
+      self_id: id,
+      post_type: event.post_type,
+      notice_type: event.notice_type,
+      sub_type: event.sub_type,
+      notice_id: event.notice_id,
+    }
+
+    switch (data.sub_type) {
+      case "action":
+        return this.makeCallback(id, event)
+      case "increase":
+      case "decrease":
+      case "update":
+      case "member.increase":
+      case "member.decrease":
+      case "member.update":
+        break
+      default:
+        Bot.makeLog("warn", ["未知通知", event], id)
+        return
+    }
+
+    //Bot.em(`${data.post_type}.${data.notice_type}.${data.sub_type}`, data)
   }
 
   getFriendMap(id) {
@@ -617,6 +746,8 @@ const adapter = new class QQBotAdapter {
       getGroupMap() { return this.gl },
       gl: this.getGroupMap(id),
       gml: this.getMemberMap(id),
+
+      callback: {},
     }
 
     await Bot[id].login()
@@ -625,8 +756,8 @@ const adapter = new class QQBotAdapter {
     for (const i of ["trace", "debug", "info", "mark", "warn", "error", "fatal"])
       Bot[id].sdk.logger[i] = (...args) => Bot.makeLog(i, args, id)
 
-    Bot[id].sdk.on("message.private", event => this.makeFriendMessage(id, event))
-    Bot[id].sdk.on("message.group", event => this.makeGroupMessage(id, event))
+    Bot[id].sdk.on("message", event => this.makeMessage(id, event))
+    Bot[id].sdk.on("notice", event => this.makeNotice(id, event))
 
     logger.mark(`${logger.blue(`[${id}]`)} ${this.name}(${this.id}) ${this.version} 已连接`)
     Bot.em(`connect.${id}`, { self_id: id })
