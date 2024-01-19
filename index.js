@@ -52,7 +52,7 @@ const adapter = new class QQBotAdapter {
     if (match) for (const url of match) {
       button.push(...this.makeButtons(data, [[{ text: url, link: url }]]))
       const img = await this.makeImage(await this.makeQRCode(url))
-      data = data.replace(url, `![${img.dec}](${img.url})`)
+      data = data.replace(url, `${img.des}${img.url}`)
     }
     return data
   }
@@ -66,7 +66,10 @@ const adapter = new class QQBotAdapter {
     else url = await Bot.fileToUrl(buffer)
 
     const size = imageSize(buffer)
-    return { dec: `图片 #${size.width}px #${size.height}px`, url }
+    return {
+      des: `![图片 #${size.width}px #${size.height}px]`,
+      url: `(${url})`,
+    }
   }
 
   makeButton(data, button, style) {
@@ -191,8 +194,8 @@ const adapter = new class QQBotAdapter {
           content += await this.makeRawMarkdownText(i.text, button)
           break
         case "image": {
-          const { dec, url } = await this.makeImage(i.file)
-          content += `![${dec}](${url})`
+          const { des, url } = await this.makeImage(i.file)
+          content += `${des}${url}`
           break
         } case "markdown":
           content += i.data
@@ -240,7 +243,7 @@ const adapter = new class QQBotAdapter {
 
   makeMarkdownTemplate(data, template) {
     const params = []
-    for (const i of ["text_start", "img_dec", "img_url", "text_end"])
+    for (const i of ["a", "b"])
     if (template[i]) params.push({ key: i, values: [template[i]] })
     return {
       type: "markdown",
@@ -287,19 +290,18 @@ const adapter = new class QQBotAdapter {
           content += i.text
           break
         case "image": {
-          const { dec, url } = await this.makeImage(i.file)
+          const { des, url } = await this.makeImage(i.file)
 
-          if (template.img_dec && template.img_url) {
-            template.text_end = content
+          if (template.b) {
+            template.b += content
             messages.push(this.makeMarkdownTemplate(data, template))
             content = ""
             button = []
           }
 
           template = {
-            text_start: content,
-            img_dec: dec,
-            img_url: url,
+            a: content+des,
+            b: url,
           }
           content = ""
           break
@@ -338,12 +340,12 @@ const adapter = new class QQBotAdapter {
       }
     }
 
-    if (template.img_dec && template.img_url)
-      template.text_end = content
+    if (template.b)
+      template.b += content
     else if (content)
-      template = { text_start: content }
+      template = { a: content }
 
-    if (template.text_start || template.text_end || (template.img_dec && template.img_url))
+    if (template.a)
       messages.push(this.makeMarkdownTemplate(data, template))
 
     for (const i in messages)
@@ -358,7 +360,7 @@ const adapter = new class QQBotAdapter {
       }
       while (button.length) {
         messages.push([
-          this.makeMarkdownTemplate(data, { text_start: " " }),
+          this.makeMarkdownTemplate(data, { a: " " }),
           ...button.splice(0,5),
         ])
       }

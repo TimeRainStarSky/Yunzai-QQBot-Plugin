@@ -39,19 +39,12 @@ TRSS-Yunzai QQBot 适配器 插件
 
 模板名称：图文消息  
 使用场景：发送图文混排消息  
-Markdown 源码：
-
-```
-{{.text_start}}![{{.img_dec}}]({{.img_url}}){{.text_end}}
-```
-
+Markdown 源码：`{{.a}}{{.b}}`  
 配置模板参数
 | 模板参数 | 参数示例 |
 | - | - |
-| text_start | 开头文字 |
-| img_dec | 图片 |
-| img_url | https://qqminiapp.cdn-go.cn/open-platform/11d80dc9/img/robot.b167c62c.png |
-| text_end | 结束文字 |
+| a | 开头文字![图片] |
+| b | (https://qqminiapp.cdn-go.cn/open-platform/11d80dc9/img/robot.b167c62c.png)结束文字 |
 
 保存 → 提交审核 → 审核完成后，输入 `#QQBotMD机器人QQ号:模板ID`
 
