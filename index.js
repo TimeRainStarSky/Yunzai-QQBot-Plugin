@@ -765,6 +765,7 @@ const adapter = new class QQBotAdapter {
   }
 
   makeGuildMessage(data, event) {
+    data.message_type = "group"
     data.sender = {
       ...data.bot.fl.get(`qg_${event.sender.user_id}`),
       ...event.sender,
