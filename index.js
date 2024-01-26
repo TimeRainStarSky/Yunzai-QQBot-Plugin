@@ -47,14 +47,14 @@ const adapter = new class QQBotAdapter {
     return (await QRCode.toDataURL(data)).replace("data:image/png;base64,", "base64://")
   }
 
-  async makeRawMarkdownText(data, button) {
-    const match = data.match(this.toQRCodeRegExp)
+  async makeRawMarkdownText(data, text, button) {
+    const match = text.match(this.toQRCodeRegExp)
     if (match) for (const url of match) {
       button.push(...this.makeButtons(data, [[{ text: url, link: url }]]))
       const img = await this.makeImage(await this.makeQRCode(url))
-      data = data.replace(url, `${img.des}${img.url}`)
+      text = text.replace(url, `${img.des}${img.url}`)
     }
-    return data
+    return text.replace(/@/g, "@​")
   }
 
   async makeImage(file) {
@@ -182,7 +182,7 @@ const adapter = new class QQBotAdapter {
           break
         case "file":
           if (i.file) i.file = await Bot.fileToUrl(i.file, i)
-          content += await this.makeRawMarkdownText(`文件：${i.file}`, button)
+          content += await this.makeRawMarkdownText(data, `文件：${i.file}`, button)
           break
         case "at":
           if (i.qq == "all")
@@ -191,7 +191,7 @@ const adapter = new class QQBotAdapter {
             content += `<@${i.qq.replace(`${data.self_id}${this.sep}`, "")}>`
           break
         case "text":
-          content += await this.makeRawMarkdownText(i.text, button)
+          content += await this.makeRawMarkdownText(data, i.text, button)
           break
         case "image": {
           const { des, url } = await this.makeImage(i.file)
@@ -216,7 +216,7 @@ const adapter = new class QQBotAdapter {
           messages.push(i.data)
           break
         default:
-          content += await this.makeRawMarkdownText(JSON.stringify(i), button)
+          content += await this.makeRawMarkdownText(data, JSON.stringify(i), button)
       }
     }
 
@@ -244,6 +244,15 @@ const adapter = new class QQBotAdapter {
         messages[i] = [reply, messages[i]]
     }
     return messages
+  }
+
+  makeMarkdownText(data, text, button) {
+    const match = text.match(this.toQRCodeRegExp)
+    if (match) for (const url of match) {
+      button.push(...this.makeButtons(data, [[{ text: url, link: url }]]))
+      text = text.replace(url, "[链接(请点击按钮查看)]")
+    }
+    return text.replace(/\n/g, "\r").replace(/@/g, "@​")
   }
 
   makeMarkdownTemplate(data, template) {
@@ -292,7 +301,7 @@ const adapter = new class QQBotAdapter {
             content += `<@${i.qq.replace(`${data.self_id}${this.sep}`, "")}>`
           break
         case "text":
-          content += i.text
+          content += this.makeMarkdownText(data, i.text, button)
           break
         case "image": {
           const { des, url } = await this.makeImage(i.file)
@@ -332,16 +341,7 @@ const adapter = new class QQBotAdapter {
           messages.push(i.data)
           break
         default:
-          content += JSON.stringify(i)
-      }
-
-      if (content) {
-        content = content.replace(/\n/g, "\r")
-        const match = content.match(this.toQRCodeRegExp)
-        if (match) for (const url of match) {
-          button.push(...this.makeButtons(data, [[{ text: url, link: url }]]))
-          content = content.replace(url, "[链接(请点击按钮查看)]")
-        }
+          content += this.makeMarkdownText(data, JSON.stringify(i), button)
       }
     }
 
@@ -519,7 +519,6 @@ const adapter = new class QQBotAdapter {
       switch (i.type) {
         case "at":
           i.user_id = i.qq.replace(/^qg_/, "")
-          continue
         case "text":
         case "face":
         case "ark":
