@@ -69,27 +69,19 @@ const adapter = new class QQBotAdapter {
     }
   }
 
-  async makeImage(file) {
-    const image = {
-      buffer: await Bot.Buffer(file),
+  async makeMarkdownImage(file) {
+    const image = (await this.makeBotImage(file)) || {
+      url: await Bot.fileToUrl(file),
     }
-    if (!Buffer.isBuffer(image.buffer)) return {}
 
-    if (file.match?.(/^https?:\/\//)) image.url = file
-    else image.url = await Bot.fileToUrl(image.buffer)
-
-    try {
-      const size = imageSize(image.buffer)
+    if (!image.width || !image.height) try {
+      const size = imageSize(await Bot.Buffer(file))
       image.width = size.width
       image.height = size.height
     } catch (err) {
       Bot.makeLog("error", ["图片分辨率检测错误", file, err])
     }
-    return image
-  }
 
-  async makeMarkdownImage(file) {
-    const image = (await this.makeBotImage(file)) || (await this.makeImage(file))
     return {
       des: `![图片 #${image.width || 0}px #${image.height || 0}px]`,
       url: `(${image.url})`,
