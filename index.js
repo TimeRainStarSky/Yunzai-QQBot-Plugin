@@ -895,17 +895,21 @@ const adapter = new class QQBotAdapter {
           ...await data.member.getInfo() || data.member,
         }
       } else {
+        if (callback[data.user_id])
+          return event.reply(3)
+        callback[data.user_id] = true
+
+        let msg = `请先发送 #QQBot绑定用户${data.user_id}`
         const real_id = callback.message.replace(/^#[Qq]+[Bb]ot绑定用户确认/, "").trim()
         if (this.bind_user[real_id] == data.user_id) {
           Bot[id].fl.set(data.user_id, {
-            ...data.bot.fl.get(data.user_id),
-            real_id,
+            ...data.bot.fl.get(data.user_id), real_id,
           })
-          event.reply(0)
-          return data.group.sendMsg(`绑定成功 ${data.user_id} → ${real_id}`)
+          msg = `绑定成功 ${data.user_id} → ${real_id}`
         }
-        event.reply(1)
-        return data.group.sendMsg(`请先发送 #QQBot绑定用户${data.user_id}`)
+
+        event.reply(0)
+        return data.group.sendMsg(msg)
       }
       Bot.makeLog("info", [`群按钮点击事件：[${data.group_name}(${data.group_id}), ${data.sender.nickname}(${data.user_id})]`, data.raw_message], data.self_id)
     } else {
@@ -1171,7 +1175,7 @@ export class QQBotAdapter extends plugin {
   }
 
   BindUser() {
-    const id = this.e.msg.replace(/^#[Qq]+[Bb]ot绑定用户/, "").trim()
+    const id = this.e.msg.replace(/^#[Qq]+[Bb]ot绑定用户(确认)?/, "").trim()
     if (id == this.e.user_id)
       return this.reply("请切换到对应Bot")
 
