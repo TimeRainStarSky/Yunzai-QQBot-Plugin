@@ -202,7 +202,7 @@ const adapter = new class QQBotAdapter {
           i.file = await this.makeSilk(i.file)
         case "video":
           if (i.file) i.file = await Bot.fileToUrl(i.file)
-          messages.push(i)
+          messages.push([i])
           break
         case "file":
           if (i.file) i.file = await Bot.fileToUrl(i.file, i)
@@ -237,7 +237,7 @@ const adapter = new class QQBotAdapter {
             messages.push(...(await this.makeRawMarkdownMsg(data, message)))
           continue
         case "raw":
-          messages.push(i.data)
+          messages.push([i.data])
           break
         default:
           content += await this.makeRawMarkdownText(data, JSON.stringify(i), button)
@@ -311,7 +311,7 @@ const adapter = new class QQBotAdapter {
           i.file = await this.makeSilk(i.file)
         case "video":
           if (i.file) i.file = await Bot.fileToUrl(i.file)
-          messages.push(i)
+          messages.push([i])
           break
         case "file":
           if (i.file) i.file = await Bot.fileToUrl(i.file, i)
@@ -332,7 +332,7 @@ const adapter = new class QQBotAdapter {
 
           if (template.b) {
             template.b += content
-            messages.push(this.makeMarkdownTemplate(data, template))
+            messages.push([this.makeMarkdownTemplate(data, template)])
             content = ""
             button = []
           }
@@ -345,9 +345,9 @@ const adapter = new class QQBotAdapter {
           break
         } case "markdown":
           if (typeof i.data == "object")
-            messages.push({ type: "markdown", ...i.data })
+            messages.push([{ type: "markdown", ...i.data }])
           else
-            messages.push({ type: "markdown", content: i.data })
+            messages.push([{ type: "markdown", content: i.data }])
           break
         case "button":
           button.push(...this.makeButtons(data, i.data))
@@ -362,7 +362,7 @@ const adapter = new class QQBotAdapter {
             messages.push(...(await this.makeMarkdownMsg(data, message)))
           continue
         case "raw":
-          messages.push(i.data)
+          messages.push([i.data])
           break
         default:
           content += this.makeMarkdownText(data, JSON.stringify(i), button)
@@ -375,11 +375,7 @@ const adapter = new class QQBotAdapter {
       template = { a: content }
 
     if (template.a)
-      messages.push(this.makeMarkdownTemplate(data, template))
-
-    for (const i in messages)
-      if (!Array.isArray(messages[i]))
-        messages[i] = [messages[i]]
+      messages.push([this.makeMarkdownTemplate(data, template)])
 
     if (button.length) {
       for (const i of messages) {
