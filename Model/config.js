@@ -10,6 +10,7 @@ const config = {
   permission: "master",
   toQRCode: true,
   toCallback: true,
+  toBotUpload: true,
   markdown: {},
   bot: {
     sandbox: false,

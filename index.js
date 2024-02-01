@@ -51,24 +51,48 @@ const adapter = new class QQBotAdapter {
     const match = text.match(this.toQRCodeRegExp)
     if (match) for (const url of match) {
       button.push(...this.makeButtons(data, [[{ text: url, link: url }]]))
-      const img = await this.makeImage(await this.makeQRCode(url))
+      const img = await this.makeMarkdownImage(await this.makeQRCode(url))
       text = text.replace(url, `${img.des}${img.url}`)
     }
     return text.replace(/@/g, "@​")
   }
 
+  async makeBotImage(file) {
+    if (config.toBotUpload) for (const i of Bot.uin) {
+      if (!Bot[i].uploadImage) continue
+      try {
+        const image = await Bot[i].uploadImage(file)
+        if (image.url) return image
+      } catch (err) {
+        Bot.makeLog("error", ["Bot", i, "图片上传错误", file, err])
+      }
+    }
+  }
+
   async makeImage(file) {
-    const buffer = await Bot.Buffer(file)
-    if (!Buffer.isBuffer(buffer)) return {}
+    const image = {
+      buffer: await Bot.Buffer(file),
+    }
+    if (!Buffer.isBuffer(image.buffer)) return {}
 
-    let url
-    if (file.match?.(/^https?:\/\//)) url = file
-    else url = await Bot.fileToUrl(buffer)
+    if (file.match?.(/^https?:\/\//)) image.url = file
+    else image.url = await Bot.fileToUrl(image.buffer)
 
-    const size = imageSize(buffer)
+    try {
+      const size = imageSize(image.buffer)
+      image.width = size.width
+      image.height = size.height
+    } catch (err) {
+      Bot.makeLog("error", ["图片分辨率检测错误", file, err])
+    }
+    return image
+  }
+
+  async makeMarkdownImage(file) {
+    const image = (await this.makeBotImage(file)) || (await this.makeImage(file))
     return {
-      des: `![图片 #${size.width}px #${size.height}px]`,
-      url: `(${url})`,
+      des: `![图片 #${image.width || 0}px #${image.height || 0}px]`,
+      url: `(${image.url})`,
     }
   }
 
@@ -194,7 +218,7 @@ const adapter = new class QQBotAdapter {
           content += await this.makeRawMarkdownText(data, i.text, button)
           break
         case "image": {
-          const { des, url } = await this.makeImage(i.file)
+          const { des, url } = await this.makeMarkdownImage(i.file)
           content += `${des}${url}`
           break
         } case "markdown":
@@ -304,7 +328,7 @@ const adapter = new class QQBotAdapter {
           content += this.makeMarkdownText(data, i.text, button)
           break
         case "image": {
-          const { des, url } = await this.makeImage(i.file)
+          const { des, url } = await this.makeMarkdownImage(i.file)
 
           if (template.b) {
             template.b += content
@@ -400,9 +424,16 @@ const adapter = new class QQBotAdapter {
         case "record":
           i.type = "audio"
           i.file = await this.makeSilk(i.file)
-        case "image":
         case "video":
           if (i.file) i.file = await Bot.fileToUrl(i.file)
+          if (message.length) {
+            messages.push(message)
+            message = []
+          }
+          break
+        case "image":
+          const image = await this.makeBotImage(i.file)
+          i.file = image?.url || await Bot.fileToUrl(i.file)
           if (message.length) {
             messages.push(message)
             message = []
