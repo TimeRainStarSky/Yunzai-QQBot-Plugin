@@ -176,8 +176,6 @@ const adapter = new class QQBotAdapter {
   }
 
   async makeRawMarkdownMsg(data, msg) {
-    if (!Array.isArray(msg))
-      msg = [msg]
     const messages = []
     let content = ""
     const button = []
@@ -284,8 +282,6 @@ const adapter = new class QQBotAdapter {
   }
 
   async makeMarkdownMsg(data, msg) {
-    if (!Array.isArray(msg))
-      msg = [msg]
     const messages = []
     let content = ""
     let button = []
@@ -390,8 +386,6 @@ const adapter = new class QQBotAdapter {
   }
 
   async makeMsg(data, msg) {
-    if (!Array.isArray(msg))
-      msg = [msg]
     const messages = []
     let message = []
     let reply
@@ -479,6 +473,8 @@ const adapter = new class QQBotAdapter {
   }
 
   async sendMsg(data, send, msg) {
+    if (!Array.isArray(msg))
+      msg = [msg]
     const rets = { message_id: [], data: [] }
     let msgs
 
@@ -525,8 +521,6 @@ const adapter = new class QQBotAdapter {
   }
 
   async makeGuildMsg(data, msg) {
-    if (!Array.isArray(msg))
-      msg = [msg]
     const messages = []
     let message = []
     let reply
@@ -599,6 +593,8 @@ const adapter = new class QQBotAdapter {
   }
 
   async sendGMsg(data, send, msg) {
+    if (!Array.isArray(msg))
+      msg = [msg]
     const rets = { message_id: [], data: [] }
     let msgs
 
@@ -918,8 +914,9 @@ const adapter = new class QQBotAdapter {
         real_id: callback.user_id,
       })
       data.friend = data.bot.pickFriend(callback.user_id)
-      if (data.friend.getInfo)
-        data.sender = await data.friend.getInfo()
+      data.sender = {
+        ...await data.friend.getInfo() || data.friend,
+      }
       Bot.makeLog("info", [`好友按钮点击事件：[${data.sender.nickname}(${data.user_id})]`, data.raw_message], data.self_id)
     }
 
@@ -1162,7 +1159,7 @@ export class QQBotAdapter extends plugin {
         return false
       }
     }
-    configSave(config)
+    configSave()
   }
 
   Markdown() {
@@ -1171,7 +1168,7 @@ export class QQBotAdapter extends plugin {
     token = token.join(":")
     this.reply(`Bot ${bot_id} Markdown 模板已设置为 ${token}`, true)
     config.markdown[bot_id] = token
-    configSave(config)
+    configSave()
   }
 
   BindUser() {
@@ -1185,7 +1182,7 @@ export class QQBotAdapter extends plugin {
       segment.button([{
         text: "确认绑定",
         callback: `#QQBot绑定用户确认${this.e.user_id}`,
-        permission: this.e.user_id
+        permission: this.e.user_id,
       }])
     ])
   }

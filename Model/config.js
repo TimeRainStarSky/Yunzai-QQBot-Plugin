@@ -3,8 +3,6 @@ import YAML from "yaml"
 import _ from "lodash"
 
 const configFile = "config/QQBot.yaml"
-const configSave = config => fs.writeFileSync(configFile, YAML.stringify({ ...config, package: undefined }), "utf-8")
-
 const config = {
   tips: "",
   permission: "master",
@@ -18,6 +16,7 @@ const config = {
   },
   token: []
 }
+const configSave = () => fs.writeFileSync(configFile, YAML.stringify({ ...config, package: undefined }), "utf-8")
 
 let configData
 
