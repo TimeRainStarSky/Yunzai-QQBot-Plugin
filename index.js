@@ -26,7 +26,22 @@ const adapter = new class QQBotAdapter {
     this.bind_user = {}
   }
 
-  async makeSilk(file) {
+  async makeBotRecord(file) {
+    if (config.toBotUpload) for (const i of Bot.uin) {
+      if (!Bot[i].uploadRecord) continue
+      try {
+        const url = await Bot[i].uploadRecord(file)
+        if (url) return url
+      } catch (err) {
+        Bot.makeLog("error", ["Bot", i, "语音上传错误", file, err])
+      }
+    }
+  }
+
+  async makeRecord(file) {
+    const ret = await this.makeBotRecord(file)
+    if (ret) return ret
+
     const inputFile = path.join("temp", randomUUID())
     const pcmFile = path.join("temp", randomUUID())
 
@@ -41,7 +56,7 @@ const adapter = new class QQBotAdapter {
     for (const i of [inputFile, pcmFile])
       try { fs.unlinkSync(i) } catch (err) {}
 
-    return file
+    return Bot.fileToUrl(file)
   }
 
   async makeQRCode(data) {
@@ -190,7 +205,9 @@ const adapter = new class QQBotAdapter {
       switch (i.type) {
         case "record":
           i.type = "audio"
-          i.file = await this.makeSilk(i.file)
+          i.file = await this.makeRecord(i.file)
+          messages.push([i])
+          break
         case "video":
           if (i.file) i.file = await Bot.fileToUrl(i.file)
           messages.push([i])
@@ -297,7 +314,9 @@ const adapter = new class QQBotAdapter {
       switch (i.type) {
         case "record":
           i.type = "audio"
-          i.file = await this.makeSilk(i.file)
+          i.file = await this.makeRecord(i.file)
+          messages.push([i])
+          break
         case "video":
           if (i.file) i.file = await Bot.fileToUrl(i.file)
           messages.push([i])
@@ -406,7 +425,12 @@ const adapter = new class QQBotAdapter {
           break
         case "record":
           i.type = "audio"
-          i.file = await this.makeSilk(i.file)
+          i.file = await this.makeRecord(i.file)
+          if (message.length) {
+            messages.push(message)
+            message = []
+          }
+          break
         case "video":
           if (i.file) i.file = await Bot.fileToUrl(i.file)
           if (message.length) {
