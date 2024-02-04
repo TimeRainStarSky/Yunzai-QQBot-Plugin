@@ -21,7 +21,6 @@ TRSS-Yunzai QQBot 适配器 插件
 ① 创建机器人  
 ② 开发设置 → 得到 `机器人QQ号:AppID:Token:AppSecret`  
 4. 输入：`#QQBot设置机器人QQ号:AppID:Token:AppSecret:[01]:[01]`
-5. 公网地址填入 `config/config/bot.yaml:url`
 
 ## 格式示例
 
@@ -30,6 +29,11 @@ TRSS-Yunzai QQBot 适配器 插件
 ```
 #QQBot设置114:514:1919:810:1:1
 ```
+
+## 发送文件（图片/语音/视频）
+
+- 使用公网地址，填入 `config/config/bot.yaml:url`，浏览器打开 url，后台日志应显示访问请求
+- 使用其他 Bot，如 [ICQQ](../../../Yunzai-ICQQ-Plugin)
 
 ## 高阶能力
 
@@ -55,6 +59,3 @@ Markdown 源码：`{{.a}}{{.b}}`
 - #QQBot账号
 - #QQBot设置 + `机器人QQ号:AppID:Token:AppSecret:是否群Bot:是否频道私域`（是1 否0）
 - #QQBotMD + `机器人QQ号:模板ID`
-
-- 注意：
-1. 需要公网地址，使用浏览器打开 url，后台日志应显示访问请求，或添加一个支持上传文件的 Bot
