@@ -26,7 +26,20 @@ const adapter = new class QQBotAdapter {
     this.bind_user = {}
   }
 
-  async makeBotRecord(file) {
+  async makeVideo(file) {
+    if (config.toBotUpload) for (const i of Bot.uin) {
+      if (!Bot[i].uploadVideo) continue
+      try {
+        const url = await Bot[i].uploadVideo(file)
+        if (url) return url
+      } catch (err) {
+        Bot.makeLog("error", ["Bot", i, "视频上传错误", file, err])
+      }
+    }
+    return Bot.fileToUrl(file)
+  }
+
+  async makeRecord(file) {
     if (config.toBotUpload) for (const i of Bot.uin) {
       if (!Bot[i].uploadRecord) continue
       try {
@@ -36,11 +49,6 @@ const adapter = new class QQBotAdapter {
         Bot.makeLog("error", ["Bot", i, "语音上传错误", file, err])
       }
     }
-  }
-
-  async makeRecord(file) {
-    const ret = await this.makeBotRecord(file)
-    if (ret) return ret
 
     const inputFile = path.join("temp", randomUUID())
     const pcmFile = path.join("temp", randomUUID())
@@ -209,7 +217,7 @@ const adapter = new class QQBotAdapter {
           messages.push([i])
           break
         case "video":
-          if (i.file) i.file = await Bot.fileToUrl(i.file)
+          i.file = await this.makeVideo(i.file)
           messages.push([i])
           break
         case "file":
@@ -318,7 +326,7 @@ const adapter = new class QQBotAdapter {
           messages.push([i])
           break
         case "video":
-          if (i.file) i.file = await Bot.fileToUrl(i.file)
+          i.file = await this.makeVideo(i.file)
           messages.push([i])
           break
         case "file":
@@ -432,7 +440,7 @@ const adapter = new class QQBotAdapter {
           }
           break
         case "video":
-          if (i.file) i.file = await Bot.fileToUrl(i.file)
+          i.file = await this.makeVideo(i.file)
           if (message.length) {
             messages.push(message)
             message = []
