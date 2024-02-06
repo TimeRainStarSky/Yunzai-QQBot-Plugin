@@ -204,7 +204,7 @@ const adapter = new class QQBotAdapter {
     const button = []
     let reply
 
-    for (let i of msg) {
+    for (let i of Array.isArray(msg) ? msg : [msg]) {
       if (typeof i == "object")
         i = { ...i }
       else
@@ -313,7 +313,7 @@ const adapter = new class QQBotAdapter {
     let template = {}
     let reply
 
-    for (let i of msg) {
+    for (let i of Array.isArray(msg) ? msg : [msg]) {
       if (typeof i == "object")
         i = { ...i }
       else
@@ -416,7 +416,7 @@ const adapter = new class QQBotAdapter {
     const messages = []
     let message = []
     let reply
-    for (let i of msg) {
+    for (let i of Array.isArray(msg) ? msg : [msg]) {
       if (typeof i == "object")
         i = { ...i }
       else
@@ -505,8 +505,6 @@ const adapter = new class QQBotAdapter {
   }
 
   async sendMsg(data, send, msg) {
-    if (!Array.isArray(msg))
-      msg = [msg]
     const rets = { message_id: [], data: [] }
     let msgs
 
@@ -556,7 +554,7 @@ const adapter = new class QQBotAdapter {
     const messages = []
     let message = []
     let reply
-    for (let i of msg) {
+    for (let i of Array.isArray(msg) ? msg : [msg]) {
       if (typeof i == "object")
         i = { ...i }
       else
@@ -625,8 +623,6 @@ const adapter = new class QQBotAdapter {
   }
 
   async sendGMsg(data, send, msg) {
-    if (!Array.isArray(msg))
-      msg = [msg]
     const rets = { message_id: [], data: [] }
     let msgs
 
