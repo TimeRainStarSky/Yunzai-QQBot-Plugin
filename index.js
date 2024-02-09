@@ -269,12 +269,11 @@ const adapter = new class QQBotAdapter {
           i.push(...button.splice(0,5))
         if (!button.length) break
       }
-      while (button.length) {
+      while (button.length)
         messages.push([
           { type: "markdown", content: " " },
           ...button.splice(0,5),
         ])
-      }
     }
 
     if (reply) for (const i in messages) {
@@ -399,12 +398,11 @@ const adapter = new class QQBotAdapter {
           i.push(...button.splice(0,5))
         if (!button.length) break
       }
-      while (button.length) {
+      while (button.length)
         messages.push([
           this.makeMarkdownTemplate(data, { a: " " }),
           ...button.splice(0,5),
         ])
-      }
     }
 
     if (reply) for (const i of messages)
@@ -415,6 +413,7 @@ const adapter = new class QQBotAdapter {
   async makeMsg(data, msg) {
     const messages = []
     let message = []
+    const button = []
     let reply
     for (let i of Array.isArray(msg) ? msg : [msg]) {
       if (typeof i == "object")
@@ -468,7 +467,7 @@ const adapter = new class QQBotAdapter {
             i = { type: "markdown", content: i.data }
           break
         case "button":
-          message.push(...this.makeButtons(data, i.data))
+          button.push(...this.makeButtons(data, i.data))
           continue
         case "node":
           for (const { message } of i.data)
@@ -499,6 +498,13 @@ const adapter = new class QQBotAdapter {
 
     if (message.length)
       messages.push(message)
+
+    while (button.length)
+      messages.push([{
+        type: "keyboard",
+        content: { rows: button.splice(0,5) },
+      }])
+
     if (reply) for (const i of messages)
       i.unshift(reply)
     return messages
