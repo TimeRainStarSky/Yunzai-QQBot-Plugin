@@ -662,6 +662,10 @@ const adapter = new class QQBotAdapter {
       const dms = await data.bot.sdk.createDirectSession(data.src_guild_id, data.user_id)
       data.guild_id = dms.guild_id
       data.channel_id = dms.channel_id
+      data.bot.fl.set(`qg_${data.user_id}`, {
+        ...data.bot.fl.get(`qg_${data.user_id}`),
+        ...dms,
+      })
     }
     Bot.makeLog("info", `发送频道私聊消息：[${data.guild_id}, ${data.user_id}] ${Bot.String(msg)}`, data.self_id)
     return this.sendGMsg(data, msg => data.bot.sdk.sendDirectMessage(data.guild_id, msg, event), msg)
@@ -777,9 +781,11 @@ const adapter = new class QQBotAdapter {
       user_id: `${data.self_id}${this.sep}${event.sender.user_id}`,
     }
     Bot.makeLog("info", `好友消息：[${data.user_id}] ${data.raw_message}`, data.self_id)
+
     data.reply = msg => this.sendFriendMsg({
       ...data, user_id: event.sender.user_id,
     }, msg, { id: data.message_id })
+    this.setFriendMap(data)
   }
 
   makeGroupMessage(data, event) {
@@ -788,9 +794,11 @@ const adapter = new class QQBotAdapter {
     }
     data.group_id = `${data.self_id}${this.sep}${event.group_id}`
     Bot.makeLog("info", `群消息：[${data.group_id}, ${data.user_id}] ${data.raw_message}`, data.self_id)
+
     data.reply = msg => this.sendGroupMsg({
       ...data, group_id: event.group_id,
     }, msg, { id: data.message_id })
+    this.setGroupMap(data)
   }
 
   makeDirectMessage(data, event) {
@@ -800,17 +808,19 @@ const adapter = new class QQBotAdapter {
       user_id: `qg_${event.sender.user_id}`,
       nickname: event.sender.user_name,
       avatar: event.author.avatar,
-      guild_id: data.guild_id,
-      channel_id: data.channel_id,
+      guild_id: event.guild_id,
+      channel_id: event.channel_id,
       src_guild_id: event.src_guild_id,
     }
     Bot.makeLog("info", `频道私聊消息：[${data.sender.nickname}(${data.user_id})] ${data.raw_message}`, data.self_id)
+
     data.reply = msg => this.sendDirectMsg({
       ...data,
       user_id: event.user_id,
       guild_id: event.guild_id,
       channel_id: event.channel_id,
     }, msg, { id: data.message_id })
+    this.setFriendMap(data)
   }
 
   makeGuildMessage(data, event) {
@@ -832,28 +842,33 @@ const adapter = new class QQBotAdapter {
       guild_id: event.guild_id,
       channel_id: event.channel_id,
     }, msg, { id: data.message_id })
+    this.setFriendMap(data)
+    this.setGroupMap(data)
   }
 
-  setListMap(data) {
+  setFriendMap(data) {
+    if (!data.user_id) return
     data.bot.fl.set(data.user_id, {
       ...data.bot.fl.get(data.user_id),
       ...data.sender,
     })
-    if (data.group_id) {
-      data.bot.gl.set(data.group_id, {
-        ...data.bot.gl.get(data.group_id),
-        group_id: data.group_id,
-      })
-      let gml = data.bot.gml.get(data.group_id)
-      if (!gml) {
-        gml = new Map
-        data.bot.gml.set(data.group_id, gml)
-      }
-      gml.set(data.user_id, {
-        ...gml.get(data.user_id),
-        ...data.sender,
-      })
+  }
+
+  setGroupMap(data) {
+    if (!data.group_id) return
+    data.bot.gl.set(data.group_id, {
+      ...data.bot.gl.get(data.group_id),
+      group_id: data.group_id,
+    })
+    let gml = data.bot.gml.get(data.group_id)
+    if (!gml) {
+      gml = new Map
+      data.bot.gml.set(data.group_id, gml)
     }
+    gml.set(data.user_id, {
+      ...gml.get(data.user_id),
+      ...data.sender,
+    })
   }
 
   makeMessage(id, event) {
@@ -888,7 +903,6 @@ const adapter = new class QQBotAdapter {
         return
     }
 
-    this.setListMap(data)
     Bot.em(`${data.post_type}.${data.message_type}.${data.sub_type}`, data)
   }
 
@@ -933,7 +947,7 @@ const adapter = new class QQBotAdapter {
         const real_id = callback.message.replace(/^#[Qq]+[Bb]ot绑定用户确认/, "").trim()
         if (this.bind_user[real_id] == data.user_id) {
           Bot[id].fl.set(data.user_id, {
-            ...data.bot.fl.get(data.user_id), real_id,
+            ...Bot[id].fl.get(data.user_id), real_id,
           })
           msg = `绑定成功 ${data.user_id} → ${real_id}`
         }
@@ -944,7 +958,7 @@ const adapter = new class QQBotAdapter {
       Bot.makeLog("info", [`群按钮点击事件：[${data.group_name}(${data.group_id}), ${data.sender.nickname}(${data.user_id})]`, data.raw_message], data.self_id)
     } else {
       Bot[id].fl.set(data.user_id, {
-        ...data.bot.fl.get(data.user_id),
+        ...Bot[id].fl.get(data.user_id),
         real_id: callback.user_id,
       })
       data.friend = data.bot.pickFriend(callback.user_id)
@@ -1005,12 +1019,16 @@ const adapter = new class QQBotAdapter {
       case "friend":
         data.message_type = "private"
         Bot.makeLog("info", [`好友按钮点击事件：[${data.user_id}]`, data.raw_message], data.self_id)
+
         data.reply = msg => this.sendFriendMsg({ ...data, user_id: event.operator_id }, msg, { id: data.message_id })
+        this.setFriendMap(data)
         break
       case "group":
         data.group_id = `${id}${this.sep}${event.group_id}`
         Bot.makeLog("info", [`群按钮点击事件：[${data.group_id}, ${data.user_id}]`, data.raw_message], data.self_id)
+
         data.reply = msg => this.sendGroupMsg({ ...data, group_id: event.group_id }, msg, { id: data.message_id })
+        this.setGroupMap(data)
         break
       case "guild":
         break
@@ -1018,7 +1036,6 @@ const adapter = new class QQBotAdapter {
         Bot.makeLog("warn", ["未知按钮点击事件", event], data.self_id)
     }
 
-    this.setListMap(data)
     Bot.em(`${data.post_type}.${data.message_type}.${data.sub_type}`, data)
   }
 
