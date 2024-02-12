@@ -1,6 +1,6 @@
 logger.info(logger.yellow("- 正在加载 QQBot 适配器插件"))
 
-import { config, configSave } from "./Model/config.js"
+import makeConfig from "../../lib/plugins/config.js"
 import fs from "node:fs"
 import path from "node:path"
 import QRCode from "qrcode"
@@ -9,12 +9,31 @@ import { randomUUID } from "node:crypto"
 import { encode as encodeSilk } from "silk-wasm"
 import { Bot as QQBot } from "qq-group-bot"
 
+const { config, configSave } = await makeConfig("QQBot", {
+  tips: "",
+  permission: "master",
+  toQRCode: true,
+  toCallback: true,
+  toBotUpload: true,
+  markdown: {},
+  bot: {
+    sandbox: false,
+    maxRetry: Infinity,
+  },
+  token: [],
+}, {
+  tips: [
+    "欢迎使用 TRSS-Yunzai QQBot Plugin ! 作者：时雨🌌星空",
+    "参考：https://github.com/TimeRainStarSky/Yunzai-QQBot-Plugin",
+  ],
+})
+
 const adapter = new class QQBotAdapter {
   constructor() {
     this.id = "QQBot"
     this.name = "QQBot"
     this.path = "data/QQBot/"
-    this.version = `qq-group-bot ${config.package.dependencies["qq-group-bot"].replace("^", "v")}`
+    this.version = `qq-group-bot v1.0.30`
 
     if (typeof config.toQRCode == "boolean")
       this.toQRCodeRegExp = config.toQRCode ? /https?:\/\/[\w\-_]+(\.[\w\-_]+)+([\w\-\.,@?^=%&:/~\+#]*[\w\-\@?^=%&/~\+#])?/g : false
@@ -1211,16 +1230,16 @@ export class QQBotAdapter extends plugin {
         return false
       }
     }
-    configSave()
+    await configSave()
   }
 
-  Markdown() {
+  async Markdown() {
     let token = this.e.msg.replace(/^#[Qq]+[Bb]ot[Mm](ark)?[Dd](own)?/, "").trim().split(":")
     const bot_id = token.shift()
     token = token.join(":")
     this.reply(`Bot ${bot_id} Markdown 模板已设置为 ${token}`, true)
     config.markdown[bot_id] = token
-    configSave()
+    await configSave()
   }
 
   BindUser() {
