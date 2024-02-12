@@ -776,7 +776,7 @@ const adapter = new class QQBotAdapter {
     }
   }
 
-  makeFriendMessage(data, event) {
+  async makeFriendMessage(data, event) {
     data.sender = {
       user_id: `${data.self_id}${this.sep}${event.sender.user_id}`,
     }
@@ -785,10 +785,10 @@ const adapter = new class QQBotAdapter {
     data.reply = msg => this.sendFriendMsg({
       ...data, user_id: event.sender.user_id,
     }, msg, { id: data.message_id })
-    this.setFriendMap(data)
+    await this.setFriendMap(data)
   }
 
-  makeGroupMessage(data, event) {
+  async makeGroupMessage(data, event) {
     data.sender = {
       user_id: `${data.self_id}${this.sep}${event.sender.user_id}`,
     }
@@ -798,10 +798,11 @@ const adapter = new class QQBotAdapter {
     data.reply = msg => this.sendGroupMsg({
       ...data, group_id: event.group_id,
     }, msg, { id: data.message_id })
-    this.setGroupMap(data)
+    data.message.unshift({ type: "at", qq: data.self_id })
+    await this.setGroupMap(data)
   }
 
-  makeDirectMessage(data, event) {
+  async makeDirectMessage(data, event) {
     data.sender = {
       ...data.bot.fl.get(`qg_${event.sender.user_id}`),
       ...event.sender,
@@ -820,10 +821,10 @@ const adapter = new class QQBotAdapter {
       guild_id: event.guild_id,
       channel_id: event.channel_id,
     }, msg, { id: data.message_id })
-    this.setFriendMap(data)
+    await this.setFriendMap(data)
   }
 
-  makeGuildMessage(data, event) {
+  async makeGuildMessage(data, event) {
     data.message_type = "group"
     data.sender = {
       ...data.bot.fl.get(`qg_${event.sender.user_id}`),
@@ -842,36 +843,36 @@ const adapter = new class QQBotAdapter {
       guild_id: event.guild_id,
       channel_id: event.channel_id,
     }, msg, { id: data.message_id })
-    this.setFriendMap(data)
-    this.setGroupMap(data)
+    await this.setFriendMap(data)
+    await this.setGroupMap(data)
   }
 
-  setFriendMap(data) {
+  async setFriendMap(data) {
     if (!data.user_id) return
-    data.bot.fl.set(data.user_id, {
+    await data.bot.fl.set(data.user_id, {
       ...data.bot.fl.get(data.user_id),
       ...data.sender,
     })
   }
 
-  setGroupMap(data) {
+  async setGroupMap(data) {
     if (!data.group_id) return
-    data.bot.gl.set(data.group_id, {
+    await data.bot.gl.set(data.group_id, {
       ...data.bot.gl.get(data.group_id),
       group_id: data.group_id,
     })
     let gml = data.bot.gml.get(data.group_id)
     if (!gml) {
       gml = new Map
-      data.bot.gml.set(data.group_id, gml)
+      await data.bot.gml.set(data.group_id, gml)
     }
-    gml.set(data.user_id, {
+    await gml.set(data.user_id, {
       ...gml.get(data.user_id),
       ...data.sender,
     })
   }
 
-  makeMessage(id, event) {
+  async makeMessage(id, event) {
     const data = {
       raw: event,
       bot: Bot[id],
@@ -888,15 +889,15 @@ const adapter = new class QQBotAdapter {
     switch (data.message_type) {
       case "private":
         if (data.sub_type == "friend")
-          this.makeFriendMessage(data, event)
+          await this.makeFriendMessage(data, event)
         else
-          this.makeDirectMessage(data, event)
+          await this.makeDirectMessage(data, event)
         break
       case "group":
-        this.makeGroupMessage(data, event)
+        await this.makeGroupMessage(data, event)
         break
       case "guild":
-        this.makeGuildMessage(data, event)
+        await this.makeGuildMessage(data, event)
         break
       default:
         Bot.makeLog("warn", ["未知消息", event], id)
@@ -946,7 +947,7 @@ const adapter = new class QQBotAdapter {
         let msg = `请先发送 #QQBot绑定用户${data.user_id}`
         const real_id = callback.message.replace(/^#[Qq]+[Bb]ot绑定用户确认/, "").trim()
         if (this.bind_user[real_id] == data.user_id) {
-          Bot[id].fl.set(data.user_id, {
+          await Bot[id].fl.set(data.user_id, {
             ...Bot[id].fl.get(data.user_id), real_id,
           })
           msg = `绑定成功 ${data.user_id} → ${real_id}`
@@ -957,7 +958,7 @@ const adapter = new class QQBotAdapter {
       }
       Bot.makeLog("info", [`群按钮点击事件：[${data.group_name}(${data.group_id}), ${data.sender.nickname}(${data.user_id})]`, data.raw_message], data.self_id)
     } else {
-      Bot[id].fl.set(data.user_id, {
+      await Bot[id].fl.set(data.user_id, {
         ...Bot[id].fl.get(data.user_id),
         real_id: callback.user_id,
       })
@@ -972,7 +973,7 @@ const adapter = new class QQBotAdapter {
     Bot.em(`${data.post_type}.${data.message_type}.${data.sub_type}`, data)
   }
 
-  makeCallback(id, event) {
+  async makeCallback(id, event) {
     const data = {
       raw: event,
       bot: Bot[id],
@@ -1021,14 +1022,14 @@ const adapter = new class QQBotAdapter {
         Bot.makeLog("info", [`好友按钮点击事件：[${data.user_id}]`, data.raw_message], data.self_id)
 
         data.reply = msg => this.sendFriendMsg({ ...data, user_id: event.operator_id }, msg, { id: data.message_id })
-        this.setFriendMap(data)
+        await this.setFriendMap(data)
         break
       case "group":
         data.group_id = `${id}${this.sep}${event.group_id}`
         Bot.makeLog("info", [`群按钮点击事件：[${data.group_id}, ${data.user_id}]`, data.raw_message], data.self_id)
 
         data.reply = msg => this.sendGroupMsg({ ...data, group_id: event.group_id }, msg, { id: data.message_id })
-        this.setGroupMap(data)
+        await this.setGroupMap(data)
         break
       case "guild":
         break
@@ -1126,13 +1127,13 @@ const adapter = new class QQBotAdapter {
       pickFriend: user_id => this.pickFriend(id, user_id),
       get pickUser() { return this.pickFriend },
       getFriendMap() { return this.fl },
-      fl: this.getFriendMap(id),
+      fl: await this.getFriendMap(id),
 
       pickMember: (group_id, user_id) => this.pickMember(id, group_id, user_id),
       pickGroup: group_id => this.pickGroup(id, group_id),
       getGroupMap() { return this.gl },
-      gl: this.getGroupMap(id),
-      gml: this.getMemberMap(id),
+      gl: await this.getGroupMap(id),
+      gml: await this.getMemberMap(id),
 
       callback: {},
     }
