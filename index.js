@@ -542,7 +542,7 @@ const adapter = new class QQBotAdapter {
       if (ret.id)
         rets.message_id.push(ret.id)
     } catch (err) {
-      Bot.makeLog("error", ["发送消息错误：", i, err], data.self_id)
+      Bot.makeLog("error", ["发送消息错误", i, err], data.self_id)
       return false
     }}
 
@@ -566,12 +566,10 @@ const adapter = new class QQBotAdapter {
   }
 
   sendFriendMsg(data, msg, event) {
-    Bot.makeLog("info", `发送好友消息：[${data.user_id}] ${Bot.String(msg)}`, data.self_id)
     return this.sendMsg(data, msg => data.bot.sdk.sendPrivateMessage(data.user_id, msg, event), msg)
   }
 
   sendGroupMsg(data, msg, event) {
-    Bot.makeLog("info", `发送群消息：[${data.group_id}] ${Bot.String(msg)}`, data.self_id)
     return this.sendMsg(data, msg => data.bot.sdk.sendGroupMessage(data.group_id, msg, event), msg)
   }
 
@@ -660,7 +658,7 @@ const adapter = new class QQBotAdapter {
       if (ret.id)
         rets.message_id.push(ret.id)
     } catch (err) {
-      Bot.makeLog("error", ["发送消息错误：", i, err], data.self_id)
+      Bot.makeLog("error", ["发送消息错误", i, err], data.self_id)
       return false
     }}
 
@@ -675,7 +673,7 @@ const adapter = new class QQBotAdapter {
   async sendDirectMsg(data, msg, event) {
     if (!data.guild_id) {
       if (!data.src_guild_id) {
-        Bot.makeLog("error", `发送频道消息失败：[${data.user_id}] 不存在来源频道信息 ${Bot.String(msg)}`, data.self_id)
+        Bot.makeLog("error", [`发送频道消息失败：[${data.user_id}] 不存在来源频道信息`, msg], data.self_id)
         return false
       }
       const dms = await data.bot.sdk.createDirectSession(data.src_guild_id, data.user_id)
@@ -686,12 +684,10 @@ const adapter = new class QQBotAdapter {
         ...dms,
       })
     }
-    Bot.makeLog("info", `发送频道私聊消息：[${data.guild_id}, ${data.user_id}] ${Bot.String(msg)}`, data.self_id)
     return this.sendGMsg(data, msg => data.bot.sdk.sendDirectMessage(data.guild_id, msg, event), msg)
   }
 
   sendGuildMsg(data, msg, event) {
-    Bot.makeLog("info", `发送频道消息：[${data.guild_id}-${data.channel_id}] ${Bot.String(msg)}`, data.self_id)
     return this.sendGMsg(data, msg => data.bot.sdk.sendGuildMessage(data.channel_id, msg, event), msg)
   }
 
