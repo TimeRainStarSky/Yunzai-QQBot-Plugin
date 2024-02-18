@@ -33,7 +33,7 @@ const adapter = new class QQBotAdapter {
     this.id = "QQBot"
     this.name = "QQBot"
     this.path = "data/QQBot/"
-    this.version = `qq-group-bot v1.0.32`
+    this.version = `qq-group-bot v1.0.33`
 
     if (typeof config.toQRCode == "boolean")
       this.toQRCodeRegExp = config.toQRCode ? /https?:\/\/[\w\-_]+(\.[\w\-_]+)+([\w\-\.,@?^=%&:/~\+#]*[\w\-\@?^=%&/~\+#])?/g : false
@@ -703,7 +703,6 @@ const adapter = new class QQBotAdapter {
     return {
       ...i,
       sendMsg: msg => this.sendFriendMsg(i, msg),
-      sendFile: (file, name) => this.sendFriendMsg(i, segment.file(file, name)),
     }
   }
 
@@ -736,7 +735,6 @@ const adapter = new class QQBotAdapter {
     return {
       ...i,
       sendMsg: msg => this.sendGroupMsg(i, msg),
-      sendFile: (file, name) => this.sendGroupMsg(i, segment.file(file, name)),
       pickMember: user_id => this.pickMember(id, group_id, user_id),
       getMemberMap: () => i.bot.gml.get(group_id),
     }
@@ -752,7 +750,6 @@ const adapter = new class QQBotAdapter {
     return {
       ...i,
       sendMsg: msg => this.sendDirectMsg(i, msg),
-      sendFile: (file, name) => this.sendDirectMsg(i, segment.file(file, name)),
     }
   }
 
@@ -785,7 +782,6 @@ const adapter = new class QQBotAdapter {
     return {
       ...i,
       sendMsg: msg => this.sendGuildMsg(i, msg),
-      sendFile: (file, name) => this.sendGuildMsg(i, segment.file(file, name)),
       pickMember: user_id => this.pickGuildMember(id, group_id, user_id),
       getMemberMap: () => i.bot.gml.get(group_id),
     }

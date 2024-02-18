@@ -3,8 +3,8 @@
   "type": "module",
   "author": "TimeRainStarSky",
   "dependencies": {
-    "qq-group-bot": "1.0.32",
+    "qq-group-bot": "1.0.33",
     "qrcode": "^1.5.3",
-    "silk-wasm": "^3.2.2"
+    "silk-wasm": "^3.2.3"
   }
 }
