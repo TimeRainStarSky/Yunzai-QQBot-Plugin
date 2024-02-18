@@ -703,6 +703,7 @@ const adapter = new class QQBotAdapter {
     return {
       ...i,
       sendMsg: msg => this.sendFriendMsg(i, msg),
+      getAvatarUrl: () => `https://q.qlogo.cn/qqapp/${i.bot.info.appid}/${i.user_id}/0`,
     }
   }
 
@@ -1124,7 +1125,7 @@ const adapter = new class QQBotAdapter {
       login() { return this.sdk.start() },
 
       uin: id,
-      info: { id },
+      info: { id, ...opts },
       get nickname() { return this.sdk.nickname },
       get avatar() { return `https://q1.qlogo.cn/g?b=qq&s=0&nk=${this.uin}` },
 
