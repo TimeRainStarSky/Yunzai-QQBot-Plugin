@@ -1,7 +1,7 @@
 logger.info(logger.yellow("- 正在加载 QQBot 适配器插件"))
 
 import makeConfig from "../../lib/plugins/config.js"
-import fs from "node:fs"
+import fs from "node:fs/promises"
 import path from "node:path"
 import QRCode from "qrcode"
 import imageSize from "image-size"
@@ -73,15 +73,15 @@ const adapter = new class QQBotAdapter {
     const pcmFile = path.join("temp", randomUUID())
 
     try {
-      fs.writeFileSync(inputFile, await Bot.Buffer(file))
+      await fs.writeFile(inputFile, await Bot.Buffer(file))
       await Bot.exec(`ffmpeg -i "${inputFile}" -f s16le -ar 48000 -ac 1 "${pcmFile}"`)
-      file = Buffer.from((await encodeSilk(fs.readFileSync(pcmFile), 48000)).data)
+      file = Buffer.from((await encodeSilk(await fs.readFile(pcmFile), 48000)).data)
     } catch (err) {
       logger.error(`silk 转码错误：${err}`)
     }
 
     for (const i of [inputFile, pcmFile])
-      try { fs.unlinkSync(i) } catch (err) {}
+      try { await fs.unlink(i) } catch (err) {}
 
     return Bot.fileToUrl(file)
   }
