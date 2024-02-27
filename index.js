@@ -33,7 +33,7 @@ const adapter = new class QQBotAdapter {
     this.id = "QQBot"
     this.name = "QQBot"
     this.path = "data/QQBot/"
-    this.version = `qq-group-bot v1.0.33`
+    this.version = `qq-group-bot v1.0.34`
 
     if (typeof config.toQRCode == "boolean")
       this.toQRCodeRegExp = config.toQRCode ? /https?:\/\/[\w\-_]+(\.[\w\-_]+)+([\w\-\.,@?^=%&:/~\+#]*[\w\-\@?^=%&/~\+#])?/g : false
@@ -896,6 +896,15 @@ const adapter = new class QQBotAdapter {
       get user_id() { return this.sender.user_id },
       message: event.message,
       raw_message: event.raw_message,
+    }
+
+    for (const i of data.message) switch (i.type) {
+      case "at":
+        if (data.message_type == "group")
+          i.qq = `${data.self_id}${this.sep}${i.user_id}`
+        else
+          i.qq = `qg_${i.user_id}`
+      break
     }
 
     switch (data.message_type) {
