@@ -15,7 +15,9 @@ const { config, configSave } = await makeConfig("QQBot", {
   toQRCode: true,
   toCallback: true,
   toBotUpload: true,
-  markdown: {},
+  markdown: {
+    template: "abcdefghij",
+  },
   bot: {
     sandbox: false,
     maxRetry: Infinity,
@@ -94,7 +96,7 @@ const adapter = new class QQBotAdapter {
     const match = text.match(this.toQRCodeRegExp)
     if (match) for (const url of match) {
       button.push(...this.makeButtons(data, [[{ text: url, link: url }]]))
-      const img = await this.makeMarkdownImage(await this.makeQRCode(url))
+      const img = await this.makeMarkdownImage(await this.makeQRCode(url), "二维码")
       text = text.replace(url, `${img.des}${img.url}`)
     }
     return text.replace(/@/g, "@​")
@@ -112,7 +114,7 @@ const adapter = new class QQBotAdapter {
     }
   }
 
-  async makeMarkdownImage(file) {
+  async makeMarkdownImage(file, summary = "图片") {
     const image = await this.makeBotImage(file) || {
       url: await Bot.fileToUrl(file),
     }
@@ -126,7 +128,7 @@ const adapter = new class QQBotAdapter {
     }
 
     return {
-      des: `![图片 #${image.width || 0}px #${image.height || 0}px]`,
+      des: `![${summary} #${image.width || 0}px #${image.height || 0}px]`,
       url: `(${image.url})`,
     }
   }
@@ -201,8 +203,7 @@ const adapter = new class QQBotAdapter {
   }
 
   makeButtons(data, button_square) {
-    const msgs = []
-    const random = Math.floor(Math.random()*2)
+    const msgs = [], random = Math.floor(Math.random()*2)
     for (const button_row of button_square) {
       let column = 0
       const buttons = []
@@ -218,10 +219,8 @@ const adapter = new class QQBotAdapter {
   }
 
   async makeRawMarkdownMsg(data, msg) {
-    const messages = []
-    let content = ""
-    const button = []
-    let reply
+    const messages = [], button = []
+    let content = "", reply
 
     for (let i of Array.isArray(msg) ? msg : [msg]) {
       if (typeof i == "object")
@@ -253,16 +252,22 @@ const adapter = new class QQBotAdapter {
           content += await this.makeRawMarkdownText(data, i.text, button)
           break
         case "image": {
-          const { des, url } = await this.makeMarkdownImage(i.file)
+          const { des, url } = await this.makeMarkdownImage(i.file, i.summary)
           content += `${des}${url}`
           break
         } case "markdown":
-          content += i.data
+          if (typeof i.data == "object")
+            messages.push([{ type: "markdown", ...i.data }])
+          else
+            content += i.data
           break
         case "button":
           button.push(...this.makeButtons(data, i.data))
           break
         case "face":
+        case "ark":
+        case "embed":
+          messages.push([i])
           break
         case "reply":
           reply = i
@@ -313,23 +318,28 @@ const adapter = new class QQBotAdapter {
     return text.replace(/\n/g, "\r").replace(/@/g, "@​")
   }
 
-  makeMarkdownTemplate(data, template) {
-    const params = []
-    for (const i of ["a", "b"])
-    if (template[i]) params.push({ key: i, values: [template[i]] })
-    return {
-      type: "markdown",
-      custom_template_id: config.markdown[data.self_id],
-      params,
+  makeMarkdownTemplate(data, templates) {
+    const msgs = []
+    for (const template of templates) {
+      const params = []
+      for (const i in template)
+        params.push({
+          key: config.markdown.template[i],
+          values: [template[i]],
+        })
+
+      msgs.push([{
+        type: "markdown",
+        custom_template_id: config.markdown[data.self_id],
+        params,
+      }])
     }
+    return msgs
   }
 
   async makeMarkdownMsg(data, msg) {
-    const messages = []
-    let content = ""
-    let button = []
-    let template = {}
-    let reply
+    const messages = [], button = [], templates = [[]]
+    let content = "", reply, template = templates[0]
 
     for (let i of Array.isArray(msg) ? msg : [msg]) {
       if (typeof i == "object")
@@ -362,31 +372,29 @@ const adapter = new class QQBotAdapter {
           content += this.makeMarkdownText(data, i.text, button)
           break
         case "image": {
-          const { des, url } = await this.makeMarkdownImage(i.file)
-
-          if (template.b) {
-            template.b += content
-            messages.push([this.makeMarkdownTemplate(data, template)])
-            content = ""
-            button = []
+          const { des, url } = await this.makeMarkdownImage(i.file, i.summary)
+          if (template.length == config.markdown.template.length-1) {
+            template.push(content)
+            template = [des]
+            templates.push(template)
+          } else {
+            template.push(content+des)
           }
-
-          template = {
-            a: content+des,
-            b: url,
-          }
-          content = ""
+          content = url
           break
         } case "markdown":
           if (typeof i.data == "object")
             messages.push([{ type: "markdown", ...i.data }])
           else
-            messages.push([{ type: "markdown", content: i.data }])
+            content += i.data
           break
         case "button":
           button.push(...this.makeButtons(data, i.data))
           break
         case "face":
+        case "ark":
+        case "embed":
+          messages.push([i])
           break
         case "reply":
           reply = i
@@ -403,13 +411,9 @@ const adapter = new class QQBotAdapter {
       }
     }
 
-    if (template.b)
-      template.b += content
-    else if (content)
-      template = { a: content }
-
-    if (template.a)
-      messages.push([this.makeMarkdownTemplate(data, template)])
+    if (content)
+      template.push(content)
+    messages.push(...this.makeMarkdownTemplate(data, templates))
 
     if (button.length) {
       for (const i of messages) {
@@ -419,7 +423,7 @@ const adapter = new class QQBotAdapter {
       }
       while (button.length)
         messages.push([
-          this.makeMarkdownTemplate(data, { a: " " }),
+          this.makeMarkdownTemplate(data, [" "]),
           ...button.splice(0,5),
         ])
     }
@@ -430,10 +434,9 @@ const adapter = new class QQBotAdapter {
   }
 
   async makeMsg(data, msg) {
-    const messages = []
-    let message = []
-    const button = []
-    let reply
+    const messages = [], button = []
+    let message = [], reply
+
     for (let i of Array.isArray(msg) ? msg : [msg]) {
       if (typeof i == "object")
         i = { ...i }
@@ -575,8 +578,7 @@ const adapter = new class QQBotAdapter {
 
   async makeGuildMsg(data, msg) {
     const messages = []
-    let message = []
-    let reply
+    let message = [], reply
     for (let i of Array.isArray(msg) ? msg : [msg]) {
       if (typeof i == "object")
         i = { ...i }
@@ -1168,7 +1170,7 @@ const adapter = new class QQBotAdapter {
     Bot[id].sdk.on("message", event => this.makeMessage(id, event))
     Bot[id].sdk.on("notice", event => this.makeNotice(id, event))
 
-    logger.mark(`${logger.blue(`[${id}]`)} ${this.name}(${this.id}) ${this.version} 已连接`)
+    Bot.makeLog("mark", `${this.name}(${this.id}) ${this.version} 已连接`, id)
     Bot.em(`connect.${id}`, { self_id: id })
     return true
   }
