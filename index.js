@@ -246,7 +246,7 @@ const adapter = new class QQBotAdapter {
           if (i.qq == "all")
             content += "@everyone"
           else
-            content += `<@${i.qq.replace(`${data.self_id}${this.sep}`, "")}>`
+            content += `<@${i.qq?.replace?.(`${data.self_id}${this.sep}`, "")}>`
           break
         case "text":
           content += await this.makeRawMarkdownText(data, i.text, button)
@@ -321,6 +321,8 @@ const adapter = new class QQBotAdapter {
   makeMarkdownTemplate(data, templates) {
     const msgs = []
     for (const template of templates) {
+      if (!template.length) continue
+
       const params = []
       for (const i in template)
         params.push({
@@ -366,7 +368,7 @@ const adapter = new class QQBotAdapter {
           if (i.qq == "all")
             content += "@everyone"
           else
-            content += `<@${i.qq.replace(`${data.self_id}${this.sep}`, "")}>`
+            content += `<@${i.qq?.replace?.(`${data.self_id}${this.sep}`, "")}>`
           break
         case "text":
           content += this.makeMarkdownText(data, i.text, button)
@@ -423,7 +425,7 @@ const adapter = new class QQBotAdapter {
       }
       while (button.length)
         messages.push([
-          this.makeMarkdownTemplate(data, [" "]),
+          ...this.makeMarkdownTemplate(data, [[" "]])[0],
           ...button.splice(0,5),
         ])
     }
@@ -445,7 +447,7 @@ const adapter = new class QQBotAdapter {
 
       switch (i.type) {
         case "at":
-          //i.user_id = i.qq.replace(`${data.self_id}${this.sep}`, "")
+          //i.user_id = i.qq?.replace?.(`${data.self_id}${this.sep}`, "")
           continue
         case "text":
         case "face":
@@ -587,7 +589,7 @@ const adapter = new class QQBotAdapter {
 
       switch (i.type) {
         case "at":
-          i.user_id = i.qq.replace(/^qg_/, "")
+          i.user_id = i.qq?.replace?.(/^qg_/, "")
         case "text":
         case "face":
         case "ark":
@@ -768,7 +770,7 @@ const adapter = new class QQBotAdapter {
       user_id: user_id.replace(/^qg_/, ""),
     }
     return {
-      ...this.pickFriend(id, user_id),
+      ...this.pickGuildFriend(id, user_id),
       ...i,
     }
   }
