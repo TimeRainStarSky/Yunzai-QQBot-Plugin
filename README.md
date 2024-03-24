@@ -30,11 +30,6 @@ TRSS-Yunzai QQBot 适配器 插件
 #QQBot设置114:514:1919:810:1:1
 ```
 
-## 发送文件（图片/语音/视频）
-
-- 使用公网地址，填入 `config/config/bot.yaml:url`，浏览器打开 url，后台日志应显示访问请求
-- 使用其他 Bot，如 [ICQQ](../../../Yunzai-ICQQ-Plugin)
-
 ## 高阶能力
 
 <details><summary>Markdown 消息</summary>

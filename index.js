@@ -35,7 +35,7 @@ const adapter = new class QQBotAdapter {
     this.id = "QQBot"
     this.name = "QQBot"
     this.path = "data/QQBot/"
-    this.version = `qq-group-bot v1.0.34`
+    this.version = `qq-group-bot v1.0.40`
 
     if (typeof config.toQRCode == "boolean")
       this.toQRCodeRegExp = config.toQRCode ? /https?:\/\/[\w\-_]+(\.[\w\-_]+)+([\w\-\.,@?^=%&:/~\+#]*[\w\-\@?^=%&/~\+#])?/g : false
@@ -45,19 +45,6 @@ const adapter = new class QQBotAdapter {
     this.sep = ":"
     if (process.platform == "win32") this.sep = ""
     this.bind_user = {}
-  }
-
-  async makeVideo(file) {
-    if (config.toBotUpload) for (const i of Bot.uin) {
-      if (!Bot[i].uploadVideo) continue
-      try {
-        const url = await Bot[i].uploadVideo(file)
-        if (url) return url
-      } catch (err) {
-        Bot.makeLog("error", ["Bot", i, "视频上传错误", file, err])
-      }
-    }
-    return Bot.fileToUrl(file)
   }
 
   async makeRecord(file) {
@@ -85,7 +72,7 @@ const adapter = new class QQBotAdapter {
     for (const i of [inputFile, pcmFile])
       try { await fs.unlink(i) } catch (err) {}
 
-    return Bot.fileToUrl(file)
+    return file
   }
 
   async makeQRCode(data) {
@@ -232,10 +219,10 @@ const adapter = new class QQBotAdapter {
         case "record":
           i.type = "audio"
           i.file = await this.makeRecord(i.file)
-          messages.push([i])
-          break
         case "video":
-          i.file = await this.makeVideo(i.file)
+        case "face":
+        case "ark":
+        case "embed":
           messages.push([i])
           break
         case "file":
@@ -263,11 +250,6 @@ const adapter = new class QQBotAdapter {
           break
         case "button":
           button.push(...this.makeButtons(data, i.data))
-          break
-        case "face":
-        case "ark":
-        case "embed":
-          messages.push([i])
           break
         case "reply":
           reply = i
@@ -353,10 +335,10 @@ const adapter = new class QQBotAdapter {
         case "record":
           i.type = "audio"
           i.file = await this.makeRecord(i.file)
-          messages.push([i])
-          break
         case "video":
-          i.file = await this.makeVideo(i.file)
+        case "face":
+        case "ark":
+        case "embed":
           messages.push([i])
           break
         case "file":
@@ -392,11 +374,6 @@ const adapter = new class QQBotAdapter {
           break
         case "button":
           button.push(...this.makeButtons(data, i.data))
-          break
-        case "face":
-        case "ark":
-        case "embed":
-          messages.push([i])
           break
         case "reply":
           reply = i
@@ -457,21 +434,8 @@ const adapter = new class QQBotAdapter {
         case "record":
           i.type = "audio"
           i.file = await this.makeRecord(i.file)
-          if (message.length) {
-            messages.push(message)
-            message = []
-          }
-          break
         case "video":
-          i.file = await this.makeVideo(i.file)
-          if (message.length) {
-            messages.push(message)
-            message = []
-          }
-          break
         case "image":
-          const image = await this.makeBotImage(i.file)
-          i.file = image?.url || await Bot.fileToUrl(i.file)
           if (message.length) {
             messages.push(message)
             message = []
