@@ -15,12 +15,14 @@ const { config, configSave } = await makeConfig("QQBot", {
   toQRCode: true,
   toCallback: true,
   toBotUpload: true,
+  hideGuildRecall: false,
   markdown: {
     template: "abcdefghij",
   },
   bot: {
     sandbox: false,
     maxRetry: Infinity,
+    timeout: 30000,
   },
   token: [],
 }, {
@@ -499,7 +501,7 @@ const adapter = new class QQBotAdapter {
   }
 
   async sendMsg(data, send, msg) {
-    const rets = { message_id: [], data: [] }
+    const rets = { message_id: [], data: [], error: [] }
     let msgs
 
     const sendMsg = async () => { for (const i of msgs) try {
@@ -512,6 +514,7 @@ const adapter = new class QQBotAdapter {
         rets.message_id.push(ret.id)
     } catch (err) {
       Bot.makeLog("error", ["发送消息错误", i, err], data.self_id)
+      rets.error.push(err)
       return false
     }}
 
@@ -614,7 +617,7 @@ const adapter = new class QQBotAdapter {
   }
 
   async sendGMsg(data, send, msg) {
-    const rets = { message_id: [], data: [] }
+    const rets = { message_id: [], data: [], error: [] }
     let msgs
 
     const sendMsg = async () => { for (const i of msgs) try {
@@ -627,6 +630,7 @@ const adapter = new class QQBotAdapter {
         rets.message_id.push(ret.id)
     } catch (err) {
       Bot.makeLog("error", ["发送消息错误", i, err], data.self_id)
+      rets.error.push(err)
       return false
     }}
 
@@ -641,7 +645,7 @@ const adapter = new class QQBotAdapter {
   async sendDirectMsg(data, msg, event) {
     if (!data.guild_id) {
       if (!data.src_guild_id) {
-        Bot.makeLog("error", [`发送频道消息失败：[${data.user_id}] 不存在来源频道信息`, msg], data.self_id)
+        Bot.makeLog("error", [`发送频道私聊消息失败：[${data.user_id}] 不存在来源频道信息`, msg], data.self_id)
         return false
       }
       const dms = await data.bot.sdk.createDirectSession(data.src_guild_id, data.user_id)
@@ -659,6 +663,39 @@ const adapter = new class QQBotAdapter {
     return this.sendGMsg(data, msg => data.bot.sdk.sendGuildMessage(data.channel_id, msg, event), msg)
   }
 
+  async recallMsg(data, recall, message_id) {
+    if (!Array.isArray(message_id))
+      message_id = [message_id]
+    const msgs = []
+    for (const i of message_id) try {
+      msgs.push(await recall(i))
+    } catch (err) {
+      Bot.makeLog("debug", ["撤回消息错误", i, err], data.self_id)
+      msgs.push(false)
+    }
+    return msgs
+  }
+
+  recallFriendMsg(data, message_id) {
+    Bot.makeLog("info", `撤回好友消息：[${data.user_id}] ${message_id}`, data.self_id)
+    return this.recallMsg(data, i => data.bot.sdk.recallFriendMessage(data.user_id, i), message_id)
+  }
+
+  recallGroupMsg(data, message_id) {
+    Bot.makeLog("info", `撤回群消息：[${data.group_id}] ${message_id}`, data.self_id)
+    return this.recallMsg(data, i => data.bot.sdk.recallGroupMessage(data.group_id, i), message_id)
+  }
+
+  recallDirectMsg(data, message_id, hide = config.hideGuildRecall) {
+    Bot.makeLog("info", `撤回${hide?"并隐藏":""}频道私聊消息：[${data.guild_id}] ${message_id}`, data.self_id)
+    return this.recallMsg(data, i => data.bot.sdk.recallDirectMessage(data.guild_id, i, hide), message_id)
+  }
+
+  recallGuildMsg(data, message_id, hide = config.hideGuildRecall) {
+    Bot.makeLog("info", `撤回${hide?"并隐藏":""}频道消息：[${data.channel_id}] ${message_id}`, data.self_id)
+    return this.recallMsg(data, i => data.bot.sdk.recallGuildMessage(data.channel_id, i, hide), message_id)
+  }
+
   pickFriend(id, user_id) {
     if (user_id.startsWith("qg_"))
       return this.pickGuildFriend(id, user_id)
@@ -671,6 +708,7 @@ const adapter = new class QQBotAdapter {
     return {
       ...i,
       sendMsg: msg => this.sendFriendMsg(i, msg),
+      recallMsg: message_id => this.recallFriendMsg(i, message_id),
       getAvatarUrl: () => `https://q.qlogo.cn/qqapp/${i.bot.info.appid}/${i.user_id}/0`,
     }
   }
@@ -704,6 +742,7 @@ const adapter = new class QQBotAdapter {
     return {
       ...i,
       sendMsg: msg => this.sendGroupMsg(i, msg),
+      recallMsg: message_id => this.recallGroupMsg(i, message_id),
       pickMember: user_id => this.pickMember(id, group_id, user_id),
       getMemberMap: () => i.bot.gml.get(group_id),
     }
@@ -719,6 +758,7 @@ const adapter = new class QQBotAdapter {
     return {
       ...i,
       sendMsg: msg => this.sendDirectMsg(i, msg),
+      recallMsg: (message_id, hide) => this.recallDirectMsg(i, message_id, hide),
     }
   }
 
@@ -736,6 +776,8 @@ const adapter = new class QQBotAdapter {
     return {
       ...this.pickGuildFriend(id, user_id),
       ...i,
+      sendMsg: msg => this.sendDirectMsg(i, msg),
+      recallMsg: (message_id, hide) => this.recallDirectMsg(i, message_id, hide),
     }
   }
 
@@ -751,6 +793,7 @@ const adapter = new class QQBotAdapter {
     return {
       ...i,
       sendMsg: msg => this.sendGuildMsg(i, msg),
+      recallMsg: (message_id, hide) => this.recallGuildMsg(i, message_id, hide),
       pickMember: user_id => this.pickGuildMember(id, group_id, user_id),
       getMemberMap: () => i.bot.gml.get(group_id),
     }
@@ -929,9 +972,9 @@ const adapter = new class QQBotAdapter {
           ...await data.member.getInfo() || data.member,
         }
       } else {
-        if (callback[data.user_id])
+        if (data.bot.callback[data.user_id])
           return event.reply(3)
-        callback[data.user_id] = true
+        data.bot.callback[data.user_id] = true
 
         let msg = `请先发送 #QQBot绑定用户${data.user_id}`
         const real_id = callback.message.replace(/^#[Qq]+[Bb]ot绑定用户确认/, "").trim()
@@ -963,6 +1006,13 @@ const adapter = new class QQBotAdapter {
   }
 
   async makeCallback(id, event) {
+    const reply = event.reply.bind(event)
+    event.reply = async (...args) => { try {
+      return await reply(...args)
+    } catch (err) {
+      Bot.makeLog("debug", ["回复按钮点击事件错误", err], data.self_id)
+    }}
+
     const data = {
       raw: event,
       bot: Bot[id],
