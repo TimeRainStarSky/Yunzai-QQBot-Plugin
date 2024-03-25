@@ -8,6 +8,7 @@ import imageSize from "image-size"
 import { randomUUID } from "node:crypto"
 import { encode as encodeSilk } from "silk-wasm"
 import { Bot as QQBot } from "qq-group-bot"
+import { decode as decodePb } from "./Model/protobuf.js"
 
 const { config, configSave } = await makeConfig("QQBot", {
   tips: "",
@@ -81,11 +82,11 @@ const adapter = new class QQBotAdapter {
     return (await QRCode.toDataURL(data)).replace("data:image/png;base64,", "base64://")
   }
 
-  async makeRawMarkdownText(data, text, button) {
+  async makeRawMarkdownText(data, baseUrl, text, button) {
     const match = text.match(this.toQRCodeRegExp)
     if (match) for (const url of match) {
       button.push(...this.makeButtons(data, [[{ text: url, link: url }]]))
-      const img = await this.makeMarkdownImage(await this.makeQRCode(url), "二维码")
+      const img = await this.makeMarkdownImage(data, baseUrl, await this.makeQRCode(url), "二维码")
       text = text.replace(url, `${img.des}${img.url}`)
     }
     return text.replace(/@/g, "@​")
@@ -103,17 +104,33 @@ const adapter = new class QQBotAdapter {
     }
   }
 
-  async makeMarkdownImage(file, summary = "图片") {
-    const image = await this.makeBotImage(file) || {
-      url: await Bot.fileToUrl(file),
+  async uploadImage(data, baseUrl, file) { try {
+    const res = await data.bot.sdk.request.post(`/v2/${baseUrl}/files`, {
+      file_type: 1,
+      file_data: file.toString("base64"),
+    })
+    const proto = decodePb(Buffer.from(res.data.file_info, "base64"))
+    return {
+      url: `http://multimedia.nt.qq.com${String(proto[1][3][baseUrl.startsWith("users/")?29:34][30]).replace(/_/g, "%5F")}`,
+      width: Number(proto[1][3][22]),
+      height: Number(proto[1][3][23]),
     }
+  } catch (err) {
+    Bot.makeLog("error", ["图片上传错误", file, err], data.self_id)
+  }}
+
+  async makeMarkdownImage(data, baseUrl, file, summary = "图片") {
+    const buffer = await Bot.Buffer(file)
+    const image = await this.uploadImage(data, baseUrl, buffer) ||
+      await this.makeBotImage(buffer) ||
+      { url: await Bot.fileToUrl(file) }
 
     if (!image.width || !image.height) try {
-      const size = imageSize(await Bot.Buffer(file))
+      const size = imageSize(buffer)
       image.width = size.width
       image.height = size.height
     } catch (err) {
-      Bot.makeLog("error", ["图片分辨率检测错误", file, err])
+      Bot.makeLog("error", ["图片分辨率检测错误", file, err], data.self_id)
     }
 
     return {
@@ -207,7 +224,7 @@ const adapter = new class QQBotAdapter {
     return msgs
   }
 
-  async makeRawMarkdownMsg(data, msg) {
+  async makeRawMarkdownMsg(data, baseUrl, msg) {
     const messages = [], button = []
     let content = "", reply
 
@@ -229,7 +246,7 @@ const adapter = new class QQBotAdapter {
           break
         case "file":
           if (i.file) i.file = await Bot.fileToUrl(i.file, i)
-          content += await this.makeRawMarkdownText(data, `文件：${i.file}`, button)
+          content += await this.makeRawMarkdownText(data, baseUrl, `文件：${i.file}`, button)
           break
         case "at":
           if (i.qq == "all")
@@ -238,10 +255,10 @@ const adapter = new class QQBotAdapter {
             content += `<@${i.qq?.replace?.(`${data.self_id}${this.sep}`, "")}>`
           break
         case "text":
-          content += await this.makeRawMarkdownText(data, i.text, button)
+          content += await this.makeRawMarkdownText(data, baseUrl, i.text, button)
           break
         case "image": {
-          const { des, url } = await this.makeMarkdownImage(i.file, i.summary)
+          const { des, url } = await this.makeMarkdownImage(data, baseUrl, i.file, i.summary)
           content += `${des}${url}`
           break
         } case "markdown":
@@ -264,7 +281,7 @@ const adapter = new class QQBotAdapter {
           messages.push([i.data])
           break
         default:
-          content += await this.makeRawMarkdownText(data, JSON.stringify(i), button)
+          content += await this.makeRawMarkdownText(data, baseUrl, JSON.stringify(i), button)
       }
     }
 
@@ -323,7 +340,7 @@ const adapter = new class QQBotAdapter {
     return msgs
   }
 
-  async makeMarkdownMsg(data, msg) {
+  async makeMarkdownMsg(data, baseUrl, msg) {
     const messages = [], button = [], templates = [[]]
     let content = "", reply, template = templates[0]
 
@@ -358,7 +375,7 @@ const adapter = new class QQBotAdapter {
           content += this.makeMarkdownText(data, i.text, button)
           break
         case "image": {
-          const { des, url } = await this.makeMarkdownImage(i.file, i.summary)
+          const { des, url } = await this.makeMarkdownImage(data, baseUrl, i.file, i.summary)
           if (template.length == config.markdown.template.length-1) {
             template.push(content)
             template = [des]
@@ -500,7 +517,7 @@ const adapter = new class QQBotAdapter {
     return messages
   }
 
-  async sendMsg(data, send, msg) {
+  async sendMsg(data, baseUrl, send, msg) {
     const rets = { message_id: [], data: [], error: [] }
     let msgs
 
@@ -520,9 +537,9 @@ const adapter = new class QQBotAdapter {
 
     if (config.markdown[data.self_id]) {
       if (config.markdown[data.self_id] == "raw")
-        msgs = await this.makeRawMarkdownMsg(data, msg)
+        msgs = await this.makeRawMarkdownMsg(data, baseUrl, msg)
       else
-        msgs = await this.makeMarkdownMsg(data, msg)
+        msgs = await this.makeMarkdownMsg(data, baseUrl, msg)
     } else {
       msgs = await this.makeMsg(data, msg)
     }
@@ -538,11 +555,11 @@ const adapter = new class QQBotAdapter {
   }
 
   sendFriendMsg(data, msg, event) {
-    return this.sendMsg(data, msg => data.bot.sdk.sendPrivateMessage(data.user_id, msg, event), msg)
+    return this.sendMsg(data, `users/${data.user_id}`, msg => data.bot.sdk.sendPrivateMessage(data.user_id, msg, event), msg)
   }
 
   sendGroupMsg(data, msg, event) {
-    return this.sendMsg(data, msg => data.bot.sdk.sendGroupMessage(data.group_id, msg, event), msg)
+    return this.sendMsg(data, `groups/${data.group_id}`, msg => data.bot.sdk.sendGroupMessage(data.group_id, msg, event), msg)
   }
 
   async makeGuildMsg(data, msg) {
