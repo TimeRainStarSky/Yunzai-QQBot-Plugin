@@ -278,7 +278,7 @@ const adapter = new class QQBotAdapter {
             messages.push(...(await this.makeRawMarkdownMsg(data, message)))
           continue
         case "raw":
-          messages.push([i.data])
+          messages.push(Array.isArray(i.data) ? i.data : [i.data])
           break
         default:
           content += await this.makeRawMarkdownText(data, baseUrl, JSON.stringify(i), button)
@@ -402,7 +402,7 @@ const adapter = new class QQBotAdapter {
             messages.push(...(await this.makeMarkdownMsg(data, message)))
           continue
         case "raw":
-          messages.push([i.data])
+          messages.push(Array.isArray(i.data) ? i.data : [i.data])
           break
         default:
           content += this.makeMarkdownText(data, JSON.stringify(i), button)
@@ -481,6 +481,10 @@ const adapter = new class QQBotAdapter {
             messages.push(...(await this.makeMsg(data, message)))
           continue
         case "raw":
+          if (Array.isArray(i.data)) {
+            messages.push(i.data)
+            continue
+          }
           i = i.data
           break
         default:
@@ -606,6 +610,10 @@ const adapter = new class QQBotAdapter {
             messages.push(...(await this.makeGuildMsg(data, message)))
           continue
         case "raw":
+          if (Array.isArray(i.data)) {
+            messages.push(i.data)
+            continue
+          }
           i = i.data
           break
         default:
