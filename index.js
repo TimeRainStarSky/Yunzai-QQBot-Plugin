@@ -38,7 +38,7 @@ const adapter = new class QQBotAdapter {
     this.id = "QQBot"
     this.name = "QQBot"
     this.path = "data/QQBot/"
-    this.version = `qq-group-bot v1.0.40`
+    this.version = `qq-group-bot v1.0.42`
 
     if (typeof config.toQRCode == "boolean")
       this.toQRCodeRegExp = config.toQRCode ? /https?:\/\/[\w\-_]+(\.[\w\-_]+)+([\w\-\.,@?^=%&:/~\+#]*[\w\-\@?^=%&/~\+#])?/g : false
@@ -275,7 +275,7 @@ const adapter = new class QQBotAdapter {
           continue
         case "node":
           for (const { message } of i.data)
-            messages.push(...(await this.makeRawMarkdownMsg(data, message)))
+            messages.push(...(await this.makeRawMarkdownMsg(data, baseUrl, message)))
           continue
         case "raw":
           messages.push(Array.isArray(i.data) ? i.data : [i.data])
@@ -399,7 +399,7 @@ const adapter = new class QQBotAdapter {
           continue
         case "node":
           for (const { message } of i.data)
-            messages.push(...(await this.makeMarkdownMsg(data, message)))
+            messages.push(...(await this.makeMarkdownMsg(data, baseUrl, message)))
           continue
         case "raw":
           messages.push(Array.isArray(i.data) ? i.data : [i.data])
