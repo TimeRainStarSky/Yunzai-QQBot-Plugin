@@ -69,7 +69,7 @@ const adapter = new class QQBotAdapter {
       await Bot.exec(`ffmpeg -i "${inputFile}" -f s16le -ar 48000 -ac 1 "${pcmFile}"`)
       file = Buffer.from((await encodeSilk(await fs.readFile(pcmFile), 48000)).data)
     } catch (err) {
-      logger.error(`silk 转码错误：${err}`)
+      Bot.makeLog("error", ["silk 转码错误", file, err])
     }
 
     for (const i of [inputFile, pcmFile])
@@ -997,9 +997,9 @@ const adapter = new class QQBotAdapter {
           ...await data.member.getInfo() || data.member,
         }
       } else {
-        if (data.bot.callback[data.user_id])
+        if (Bot[id].callback[data.user_id])
           return event.reply(3)
-        data.bot.callback[data.user_id] = true
+        Bot[id].callback[data.user_id] = true
 
         let msg = `请先发送 #QQBot绑定用户${data.user_id}`
         const real_id = callback.message.replace(/^#[Qq]+[Bb]ot绑定用户确认/, "").trim()
