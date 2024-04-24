@@ -1249,7 +1249,10 @@ const adapter = new class QQBotAdapter {
 
     Bot[id].sdk.logger = {}
     for (const i of ["trace", "debug", "info", "mark", "warn", "error", "fatal"])
-      Bot[id].sdk.logger[i] = (...args) => Bot.makeLog(i, args, id)
+      Bot[id].sdk.logger[i] = (...args) => {
+        if (args[0]?.startsWith?.("recv from")) return
+        return Bot.makeLog(i, args, id)
+      }
 
     await Bot[id].login()
 
