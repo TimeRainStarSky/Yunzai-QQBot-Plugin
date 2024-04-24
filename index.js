@@ -310,13 +310,31 @@ const adapter = new class QQBotAdapter {
     return messages
   }
 
-  makeMarkdownText(data, text, button) {
+  makeMarkdownText_(data, text, button) {
     const match = text.match(this.toQRCodeRegExp)
     if (match) for (const url of match) {
       button.push(...this.makeButtons(data, [[{ text: url, link: url }]]))
       text = text.replace(url, "[链接(请点击按钮查看)]")
     }
     return text.replace(/\n/g, "\r").replace(/@/g, "@​")
+  }
+
+  makeMarkdownText(data, text, content, button) {
+    const match = text.match(/!?\[.*?\]\s*\(\w+:\/\/.*?\)/g)
+    if (match) {
+      const temp = []
+      let last = ""
+      for (const i of match) {
+        const match = i.match(/(!?\[.*?\])\s*(\(\w+:\/\/.*?\))/)
+        text = text.split(i)
+        temp.push([last+this.makeMarkdownText_(data, text.shift(), button), match[1]])
+        text = text.join(i)
+        last = match[2]
+      }
+      temp[0][0] = content + temp[0][0]
+      return [last+this.makeMarkdownText_(data, text, button), temp]
+    }
+    return [this.makeMarkdownText_(data, text, button)]
   }
 
   makeMarkdownTemplate(data, templates) {
@@ -338,6 +356,19 @@ const adapter = new class QQBotAdapter {
       }])
     }
     return msgs
+  }
+
+  makeMarkdownTemplatePush(content, template, templates) {
+    for (const i of content) {
+      if (template.length == config.markdown.template.length-1) {
+        template.push(i.shift())
+        template = i
+        templates.push(template)
+      } else {
+        template.push(i.join(""))
+      }
+    }
+    return template
   }
 
   async makeMarkdownMsg(data, baseUrl, msg) {
@@ -371,18 +402,18 @@ const adapter = new class QQBotAdapter {
           else
             content += `<@${i.qq?.replace?.(`${data.self_id}${this.sep}`, "")}>`
           break
-        case "text":
-          content += this.makeMarkdownText(data, i.text, button)
-          break
-        case "image": {
-          const { des, url } = await this.makeMarkdownImage(data, baseUrl, i.file, i.summary)
-          if (template.length == config.markdown.template.length-1) {
-            template.push(content)
-            template = [des]
-            templates.push(template)
+        case "text": {
+          const [text, temp] = this.makeMarkdownText(data, i.text, content, button)
+          if (Array.isArray(temp)) {
+            template = this.makeMarkdownTemplatePush(temp, template, templates)
+            content = text
           } else {
-            template.push(content+des)
+            content += text
           }
+          break
+        } case "image": {
+          const { des, url } = await this.makeMarkdownImage(data, baseUrl, i.file, i.summary)
+          template = this.makeMarkdownTemplatePush([[content, des]], template, templates)
           content = url
           break
         } case "markdown":
@@ -404,8 +435,15 @@ const adapter = new class QQBotAdapter {
         case "raw":
           messages.push(Array.isArray(i.data) ? i.data : [i.data])
           break
-        default:
-          content += this.makeMarkdownText(data, JSON.stringify(i), button)
+        default: {
+          const [text, temp] = this.makeMarkdownText(data, JSON.stringify(i), content, button)
+          if (Array.isArray(temp)) {
+            template = this.makeMarkdownTemplatePush(temp, template, templates)
+            content = text
+          } else {
+            content += text
+          }
+        }
       }
     }
 
@@ -1186,7 +1224,7 @@ const adapter = new class QQBotAdapter {
       uin: id,
       info: { id, ...opts },
       get nickname() { return this.sdk.nickname },
-      get avatar() { return `https://q1.qlogo.cn/g?b=qq&s=0&nk=${this.uin}` },
+      get avatar() { return `https://q.qlogo.cn/g?b=qq&s=0&nk=${this.uin}` },
 
       version: {
         id: this.id,
