@@ -4,8 +4,8 @@ import makeConfig from "../../lib/plugins/config.js"
 import fs from "node:fs/promises"
 import path from "node:path"
 import QRCode from "qrcode"
+import { ulid } from "ulid"
 import imageSize from "image-size"
-import { randomUUID } from "node:crypto"
 import { encode as encodeSilk } from "silk-wasm"
 import { Bot as QQBot } from "qq-group-bot"
 import { decode as decodePb } from "./Model/protobuf.js"
@@ -61,8 +61,8 @@ const adapter = new class QQBotAdapter {
       }
     }
 
-    const inputFile = path.join("temp", randomUUID())
-    const pcmFile = path.join("temp", randomUUID())
+    const inputFile = path.join("temp", ulid())
+    const pcmFile = path.join("temp", ulid())
 
     try {
       await fs.writeFile(inputFile, await Bot.Buffer(file))
@@ -104,25 +104,9 @@ const adapter = new class QQBotAdapter {
     }
   }
 
-  async uploadImage(data, baseUrl, file) { try {
-    const res = await data.bot.sdk.request.post(`/v2/${baseUrl}/files`, {
-      file_type: 1,
-      file_data: file.toString("base64"),
-    })
-    const proto = decodePb(Buffer.from(res.data.file_info, "base64"))
-    return {
-      url: `http://multimedia.nt.qq.com${String(proto[1][3][baseUrl.startsWith("users/")?29:34][30]).replace(/_/g, "%5F")}`,
-      width: Number(proto[1][3][22]),
-      height: Number(proto[1][3][23]),
-    }
-  } catch (err) {
-    Bot.makeLog("error", ["图片上传错误", file, err], data.self_id)
-  }}
-
   async makeMarkdownImage(data, baseUrl, file, summary = "图片") {
     const buffer = await Bot.Buffer(file)
-    const image = await this.uploadImage(data, baseUrl, buffer) ||
-      await this.makeBotImage(buffer) ||
+    const image = await this.makeBotImage(buffer) ||
       { url: await Bot.fileToUrl(file) }
 
     if (!image.width || !image.height) try {
@@ -141,7 +125,7 @@ const adapter = new class QQBotAdapter {
 
   makeButton(data, button, style) {
     const msg = {
-      id: randomUUID(),
+      id: ulid(),
       render_data: {
         label: button.text,
         visited_label: button.clicked_text,
