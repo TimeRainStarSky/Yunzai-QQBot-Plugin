@@ -6,6 +6,7 @@ import path from "node:path"
 import QRCode from "qrcode"
 import { ulid } from "ulid"
 import imageSize from "image-size"
+import urlRegexSafe from "url-regex-safe"
 import { encode as encodeSilk } from "silk-wasm"
 import { Bot as QQBot } from "qq-group-bot"
 import { decode as decodePb } from "./Model/protobuf.js"
@@ -40,10 +41,17 @@ const adapter = new class QQBotAdapter {
     this.path = "data/QQBot/"
     this.version = `qq-group-bot v1.0.42`
 
-    if (typeof config.toQRCode == "boolean")
-      this.toQRCodeRegExp = config.toQRCode ? /https?:\/\/[\w\-_]+(\.[\w\-_]+)+([\w\-\.,@?^=%&:/~\+#]*[\w\-\@?^=%&/~\+#])?/g : false
-    else
-      this.toQRCodeRegExp = new RegExp(config.toQRCode, "g")
+    switch (typeof config.toQRCode) {
+      case "boolean":
+        this.toQRCodeRegExp = config.toQRCode ? urlRegexSafe() : false
+        break
+      case "string":
+        this.toQRCodeRegExp = new RegExp(config.toQRCode, "g")
+        break
+      case "object":
+        this.toQRCodeRegExp = urlRegexSafe(config.toQRCode)
+        break
+    }
 
     this.sep = ":"
     if (process.platform == "win32") this.sep = ""
