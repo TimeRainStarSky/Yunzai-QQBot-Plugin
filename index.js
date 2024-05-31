@@ -39,7 +39,7 @@ const adapter = new class QQBotAdapter {
     this.id = "QQBot"
     this.name = "QQBot"
     this.path = "data/QQBot/"
-    this.version = `qq-group-bot v1.0.42`
+    this.version = "qq-group-bot v1.1.0"
 
     switch (typeof config.toQRCode) {
       case "boolean":
@@ -90,11 +90,11 @@ const adapter = new class QQBotAdapter {
     return (await QRCode.toDataURL(data)).replace("data:image/png;base64,", "base64://")
   }
 
-  async makeRawMarkdownText(data, baseUrl, text, button) {
+  async makeRawMarkdownText(data, text, button) {
     const match = text.match(this.toQRCodeRegExp)
     if (match) for (const url of match) {
       button.push(...this.makeButtons(data, [[{ text: url, link: url }]]))
-      const img = await this.makeMarkdownImage(data, baseUrl, await this.makeQRCode(url), "二维码")
+      const img = await this.makeMarkdownImage(data, await this.makeQRCode(url), "二维码")
       text = text.replace(url, `${img.des}${img.url}`)
     }
     return text.replace(/@/g, "@​")
@@ -112,7 +112,7 @@ const adapter = new class QQBotAdapter {
     }
   }
 
-  async makeMarkdownImage(data, baseUrl, file, summary = "图片") {
+  async makeMarkdownImage(data, file, summary = "图片") {
     const buffer = await Bot.Buffer(file)
     const image = await this.makeBotImage(buffer) ||
       { url: await Bot.fileToUrl(file) }
@@ -216,7 +216,7 @@ const adapter = new class QQBotAdapter {
     return msgs
   }
 
-  async makeRawMarkdownMsg(data, baseUrl, msg) {
+  async makeRawMarkdownMsg(data, msg) {
     const messages = [], button = []
     let content = "", reply
 
@@ -238,7 +238,7 @@ const adapter = new class QQBotAdapter {
           break
         case "file":
           if (i.file) i.file = await Bot.fileToUrl(i.file, i)
-          content += await this.makeRawMarkdownText(data, baseUrl, `文件：${i.file}`, button)
+          content += await this.makeRawMarkdownText(data, `文件：${i.file}`, button)
           break
         case "at":
           if (i.qq == "all")
@@ -247,10 +247,10 @@ const adapter = new class QQBotAdapter {
             content += `<@${i.qq?.replace?.(`${data.self_id}${this.sep}`, "")}>`
           break
         case "text":
-          content += await this.makeRawMarkdownText(data, baseUrl, i.text, button)
+          content += await this.makeRawMarkdownText(data, i.text, button)
           break
         case "image": {
-          const { des, url } = await this.makeMarkdownImage(data, baseUrl, i.file, i.summary)
+          const { des, url } = await this.makeMarkdownImage(data, i.file, i.summary)
           content += `${des}${url}`
           break
         } case "markdown":
@@ -263,17 +263,20 @@ const adapter = new class QQBotAdapter {
           button.push(...this.makeButtons(data, i.data))
           break
         case "reply":
-          reply = i
+          if (i.id.startsWith("event_"))
+            reply = { type: "reply", event_id: i.id.replace(/^event_/, "") }
+          else
+            reply = i
           continue
         case "node":
           for (const { message } of i.data)
-            messages.push(...(await this.makeRawMarkdownMsg(data, baseUrl, message)))
+            messages.push(...(await this.makeRawMarkdownMsg(data, message)))
           continue
         case "raw":
           messages.push(Array.isArray(i.data) ? i.data : [i.data])
           break
         default:
-          content += await this.makeRawMarkdownText(data, baseUrl, JSON.stringify(i), button)
+          content += await this.makeRawMarkdownText(data, JSON.stringify(i), button)
       }
     }
 
@@ -363,7 +366,7 @@ const adapter = new class QQBotAdapter {
     return template
   }
 
-  async makeMarkdownMsg(data, baseUrl, msg) {
+  async makeMarkdownMsg(data, msg) {
     const messages = [], button = [], templates = [[]]
     let content = "", reply, template = templates[0]
 
@@ -404,7 +407,7 @@ const adapter = new class QQBotAdapter {
           }
           break
         } case "image": {
-          const { des, url } = await this.makeMarkdownImage(data, baseUrl, i.file, i.summary)
+          const { des, url } = await this.makeMarkdownImage(data, i.file, i.summary)
           template = this.makeMarkdownTemplatePush([[content, des]], template, templates)
           content = url
           break
@@ -418,11 +421,14 @@ const adapter = new class QQBotAdapter {
           button.push(...this.makeButtons(data, i.data))
           break
         case "reply":
-          reply = i
+          if (i.id.startsWith("event_"))
+            reply = { type: "reply", event_id: i.id.replace(/^event_/, "") }
+          else
+            reply = i
           continue
         case "node":
           for (const { message } of i.data)
-            messages.push(...(await this.makeMarkdownMsg(data, baseUrl, message)))
+            messages.push(...(await this.makeMarkdownMsg(data, message)))
           continue
         case "raw":
           messages.push(Array.isArray(i.data) ? i.data : [i.data])
@@ -495,7 +501,10 @@ const adapter = new class QQBotAdapter {
           i = { type: "text", text: `文件：${i.file}` }
           break
         case "reply":
-          reply = i
+          if (i.id.startsWith("event_"))
+            reply = { type: "reply", event_id: i.id.replace(/^event_/, "") }
+          else
+            reply = i
           continue
         case "markdown":
           if (typeof i.data == "object")
@@ -551,7 +560,7 @@ const adapter = new class QQBotAdapter {
     return messages
   }
 
-  async sendMsg(data, baseUrl, send, msg) {
+  async sendMsg(data, send, msg) {
     const rets = { message_id: [], data: [], error: [] }
     let msgs
 
@@ -571,9 +580,9 @@ const adapter = new class QQBotAdapter {
 
     if (config.markdown[data.self_id]) {
       if (config.markdown[data.self_id] == "raw")
-        msgs = await this.makeRawMarkdownMsg(data, baseUrl, msg)
+        msgs = await this.makeRawMarkdownMsg(data, msg)
       else
-        msgs = await this.makeMarkdownMsg(data, baseUrl, msg)
+        msgs = await this.makeMarkdownMsg(data, msg)
     } else {
       msgs = await this.makeMsg(data, msg)
     }
@@ -589,11 +598,11 @@ const adapter = new class QQBotAdapter {
   }
 
   sendFriendMsg(data, msg, event) {
-    return this.sendMsg(data, `users/${data.user_id}`, msg => data.bot.sdk.sendPrivateMessage(data.user_id, msg, event), msg)
+    return this.sendMsg(data, msg => data.bot.sdk.sendPrivateMessage(data.user_id, msg, event), msg)
   }
 
   sendGroupMsg(data, msg, event) {
-    return this.sendMsg(data, `groups/${data.group_id}`, msg => data.bot.sdk.sendGroupMessage(data.group_id, msg, event), msg)
+    return this.sendMsg(data, msg => data.bot.sdk.sendGroupMessage(data.group_id, msg, event), msg)
   }
 
   async makeGuildMsg(data, msg) {
@@ -1000,7 +1009,7 @@ const adapter = new class QQBotAdapter {
       bot: Bot[callback.self_id],
       self_id: callback.self_id,
       post_type: "message",
-      message_id: event.notice_id,
+      message_id: event.event_id ? `event_${event.event_id}` : event.notice_id,
       message_type: callback.group_id ? "group" : "private",
       sub_type: "callback",
       get user_id() { return this.sender.user_id },
@@ -1073,7 +1082,7 @@ const adapter = new class QQBotAdapter {
       bot: Bot[id],
       self_id: id,
       post_type: "message",
-      message_id: event.notice_id,
+      message_id: event.event_id ? `event_${event.event_id}` : event.notice_id,
       message_type: event.notice_type,
       sub_type: "callback",
       get user_id() { return this.sender.user_id },
@@ -1258,10 +1267,7 @@ const adapter = new class QQBotAdapter {
 
   async load() {
     for (const token of config.token)
-      await new Promise(resolve => {
-        adapter.connect(token).then(resolve)
-        setTimeout(resolve, 5000)
-      })
+      await Bot.sleep(5000, this.connect(token))
   }
 }
 

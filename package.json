@@ -4,7 +4,7 @@
   "author": "TimeRainStarSky",
   "dependencies": {
     "@goodtools/protobuf-decoder": "^1.0.0",
-    "qq-group-bot": "1.0.42",
+    "qq-group-bot": "1.1.0",
     "qrcode": "^1.5.3",
     "silk-wasm": "^3.4.0",
     "url-regex-safe": "^4.0.0"
