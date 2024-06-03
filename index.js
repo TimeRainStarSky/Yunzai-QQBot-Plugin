@@ -54,7 +54,7 @@ const adapter = new class QQBotAdapter {
     }
 
     this.sep = ":"
-    if (process.platform == "win32") this.sep = ""
+    if (process.platform === "win32") this.sep = ""
     this.bind_user = {}
   }
 
@@ -186,7 +186,7 @@ const adapter = new class QQBotAdapter {
     else return false
 
     if (button.permission) {
-      if (button.permission == "admin") {
+      if (button.permission === "admin") {
         msg.action.permission.type = 1
       } else {
         msg.action.permission.type = 0
@@ -221,10 +221,10 @@ const adapter = new class QQBotAdapter {
     let content = "", reply
 
     for (let i of Array.isArray(msg) ? msg : [msg]) {
-      if (typeof i == "object")
+      if (typeof i === "object")
         i = { ...i }
       else
-        i = { type: "text", text: i }
+        i = { type: "text", text: Bot.String(i) }
 
       switch (i.type) {
         case "record":
@@ -241,7 +241,7 @@ const adapter = new class QQBotAdapter {
           content += await this.makeRawMarkdownText(data, `文件：${i.file}`, button)
           break
         case "at":
-          if (i.qq == "all")
+          if (i.qq === "all")
             content += "@everyone"
           else
             content += `<@${i.qq?.replace?.(`${data.self_id}${this.sep}`, "")}>`
@@ -254,7 +254,7 @@ const adapter = new class QQBotAdapter {
           content += `${des}${url}`
           break
         } case "markdown":
-          if (typeof i.data == "object")
+          if (typeof i.data === "object")
             messages.push([{ type: "markdown", ...i.data }])
           else
             content += i.data
@@ -276,7 +276,7 @@ const adapter = new class QQBotAdapter {
           messages.push(Array.isArray(i.data) ? i.data : [i.data])
           break
         default:
-          content += await this.makeRawMarkdownText(data, JSON.stringify(i), button)
+          content += await this.makeRawMarkdownText(data, Bot.String(i), button)
       }
     }
 
@@ -285,7 +285,7 @@ const adapter = new class QQBotAdapter {
 
     if (button.length) {
       for (const i of messages) {
-        if (i[0].type == "markdown")
+        if (i[0].type === "markdown")
           i.push(...button.splice(0,5))
         if (!button.length) break
       }
@@ -355,7 +355,7 @@ const adapter = new class QQBotAdapter {
 
   makeMarkdownTemplatePush(content, template, templates) {
     for (const i of content) {
-      if (template.length == config.markdown.template.length-1) {
+      if (template.length === config.markdown.template.length-1) {
         template.push(i.shift())
         template = i
         templates.push(template)
@@ -371,10 +371,10 @@ const adapter = new class QQBotAdapter {
     let content = "", reply, template = templates[0]
 
     for (let i of Array.isArray(msg) ? msg : [msg]) {
-      if (typeof i == "object")
+      if (typeof i === "object")
         i = { ...i }
       else
-        i = { type: "text", text: i }
+        i = { type: "text", text: Bot.String(i) }
 
       switch (i.type) {
         case "record":
@@ -392,7 +392,7 @@ const adapter = new class QQBotAdapter {
           content += "[文件(请点击按钮查看)]"
           break
         case "at":
-          if (i.qq == "all")
+          if (i.qq === "all")
             content += "@everyone"
           else
             content += `<@${i.qq?.replace?.(`${data.self_id}${this.sep}`, "")}>`
@@ -412,7 +412,7 @@ const adapter = new class QQBotAdapter {
           content = url
           break
         } case "markdown":
-          if (typeof i.data == "object")
+          if (typeof i.data === "object")
             messages.push([{ type: "markdown", ...i.data }])
           else
             content += i.data
@@ -434,7 +434,7 @@ const adapter = new class QQBotAdapter {
           messages.push(Array.isArray(i.data) ? i.data : [i.data])
           break
         default: {
-          const [text, temp] = this.makeMarkdownText(data, JSON.stringify(i), content, button)
+          const [text, temp] = this.makeMarkdownText(data, Bot.String(i), content, button)
           if (Array.isArray(temp)) {
             template = this.makeMarkdownTemplatePush(temp, template, templates)
             content = text
@@ -451,7 +451,7 @@ const adapter = new class QQBotAdapter {
 
     if (button.length) {
       for (const i of messages) {
-        if (i[0].type == "markdown")
+        if (i[0].type === "markdown")
           i.push(...button.splice(0,5))
         if (!button.length) break
       }
@@ -472,10 +472,10 @@ const adapter = new class QQBotAdapter {
     let message = [], reply
 
     for (let i of Array.isArray(msg) ? msg : [msg]) {
-      if (typeof i == "object")
+      if (typeof i === "object")
         i = { ...i }
       else
-        i = { type: "text", text: i }
+        i = { type: "text", text: Bot.String(i) }
 
       switch (i.type) {
         case "at":
@@ -507,7 +507,7 @@ const adapter = new class QQBotAdapter {
             reply = i
           continue
         case "markdown":
-          if (typeof i.data == "object")
+          if (typeof i.data === "object")
             i = { type: "markdown", ...i.data }
           else
             i = { type: "markdown", content: i.data }
@@ -527,10 +527,10 @@ const adapter = new class QQBotAdapter {
           i = i.data
           break
         default:
-          i = { type: "text", text: JSON.stringify(i) }
+          i = { type: "text", text: Bot.String(i) }
       }
 
-      if (i.type == "text" && i.text) {
+      if (i.type === "text" && i.text) {
         const match = i.text.match(this.toQRCodeRegExp)
         if (match) for (const url of match) {
           const msg = segment.image(await Bot.fileToUrl(await this.makeQRCode(url)))
@@ -579,7 +579,7 @@ const adapter = new class QQBotAdapter {
     }}
 
     if (config.markdown[data.self_id]) {
-      if (config.markdown[data.self_id] == "raw")
+      if (config.markdown[data.self_id] === "raw")
         msgs = await this.makeRawMarkdownMsg(data, msg)
       else
         msgs = await this.makeMarkdownMsg(data, msg)
@@ -609,10 +609,10 @@ const adapter = new class QQBotAdapter {
     const messages = []
     let message = [], reply
     for (let i of Array.isArray(msg) ? msg : [msg]) {
-      if (typeof i == "object")
+      if (typeof i === "object")
         i = { ...i }
       else
-        i = { type: "text", text: i }
+        i = { type: "text", text: Bot.String(i) }
 
       switch (i.type) {
         case "at":
@@ -637,7 +637,7 @@ const adapter = new class QQBotAdapter {
           reply = i
           continue
         case "markdown":
-          if (typeof i.data == "object")
+          if (typeof i.data === "object")
             i = { type: "markdown", ...i.data }
           else
             i = { type: "markdown", content: i.data }
@@ -656,10 +656,10 @@ const adapter = new class QQBotAdapter {
           i = i.data
           break
         default:
-          i = { type: "text", text: JSON.stringify(i) }
+          i = { type: "text", text: Bot.String(i) }
       }
 
-      if (i.type == "text" && i.text) {
+      if (i.type === "text" && i.text) {
         const match = i.text.match(this.toQRCodeRegExp)
         if (match) for (const url of match) {
           const msg = segment.image(await this.makeQRCode(url))
@@ -761,7 +761,9 @@ const adapter = new class QQBotAdapter {
   }
 
   pickFriend(id, user_id) {
-    if (user_id.startsWith("qg_"))
+    if (typeof user_id !== "string")
+      user_id = String(user_id)
+    else if (user_id.startsWith("qg_"))
       return this.pickGuildFriend(id, user_id)
     const i = {
       ...Bot[id].fl.get(user_id),
@@ -778,7 +780,11 @@ const adapter = new class QQBotAdapter {
   }
 
   pickMember(id, group_id, user_id) {
-    if (user_id.startsWith("qg_"))
+    if (typeof group_id !== "string")
+      group_id = String(group_id)
+    if (typeof user_id !== "string")
+      user_id = String(user_id)
+    else if (user_id.startsWith("qg_"))
       return this.pickGuildMember(id, group_id, user_id)
     const i = {
       ...Bot[id].fl.get(user_id),
@@ -795,7 +801,9 @@ const adapter = new class QQBotAdapter {
   }
 
   pickGroup(id, group_id) {
-    if (group_id.startsWith("qg_"))
+    if (typeof group_id !== "string")
+      group_id = String(group_id)
+    else if (group_id.startsWith("qg_"))
       return this.pickGuild(id, group_id)
     const i = {
       ...Bot[id].gl.get(group_id),
@@ -975,7 +983,7 @@ const adapter = new class QQBotAdapter {
 
     for (const i of data.message) switch (i.type) {
       case "at":
-        if (data.message_type == "group")
+        if (data.message_type === "group")
           i.qq = `${data.self_id}${this.sep}${i.user_id}`
         else
           i.qq = `qg_${i.user_id}`
@@ -984,7 +992,7 @@ const adapter = new class QQBotAdapter {
 
     switch (data.message_type) {
       case "private":
-        if (data.sub_type == "friend")
+        if (data.sub_type === "friend")
           await this.makeFriendMessage(data, event)
         else
           await this.makeDirectMessage(data, event)
@@ -1042,7 +1050,7 @@ const adapter = new class QQBotAdapter {
 
         let msg = `请先发送 #QQBot绑定用户${data.user_id}`
         const real_id = callback.message.replace(/^#[Qq]+[Bb]ot绑定用户确认/, "").trim()
-        if (this.bind_user[real_id] == data.user_id) {
+        if (this.bind_user[real_id] === data.user_id) {
           await Bot[id].fl.set(data.user_id, {
             ...Bot[id].fl.get(data.user_id), real_id,
           })
@@ -1310,7 +1318,7 @@ export class QQBotAdapter extends plugin {
   async Token() {
     const token = this.e.msg.replace(/^#[Qq]+[Bb]ot设置/, "").trim()
     if (config.token.includes(token)) {
-      config.token = config.token.filter(item => item != token)
+      config.token = config.token.filter(item => item !== token)
       this.reply(`账号已删除，重启后生效，共${config.token.length}个账号`, true)
     } else {
       if (await adapter.connect(token)) {
@@ -1335,7 +1343,7 @@ export class QQBotAdapter extends plugin {
 
   BindUser() {
     const id = this.e.msg.replace(/^#[Qq]+[Bb]ot绑定用户(确认)?/, "").trim()
-    if (id == this.e.user_id)
+    if (id === this.e.user_id)
       return this.reply("请切换到对应Bot")
 
     adapter.bind_user[this.e.user_id] = id
