@@ -513,7 +513,7 @@ const adapter = new class QQBotAdapter {
             i = { type: "markdown", content: i.data }
           break
         case "button":
-          button.push(...this.makeButtons(data, i.data))
+          //button.push(...this.makeButtons(data, i.data))
           continue
         case "node":
           for (const { message } of i.data)
