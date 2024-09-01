@@ -5,8 +5,8 @@
   "dependencies": {
     "@goodtools/protobuf-decoder": "^1.0.0",
     "qq-group-bot": "1.1.0",
-    "qrcode": "^1.5.3",
-    "silk-wasm": "^3.4.0",
+    "qrcode": "^1.5.4",
+    "silk-wasm": "^3.6.1",
     "url-regex-safe": "^4.0.0"
   }
 }
