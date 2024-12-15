@@ -7,9 +7,8 @@ import QRCode from "qrcode"
 import { ulid } from "ulid"
 import imageSize from "image-size"
 import urlRegexSafe from "url-regex-safe"
-import { encode as encodeSilk } from "silk-wasm"
+import { encode as encodeSilk, isSilk } from "silk-wasm"
 import { Bot as QQBot } from "qq-group-bot"
-import { decode as decodePb } from "./Model/protobuf.js"
 
 const { config, configSave } = await makeConfig("QQBot", {
   tips: "",
@@ -54,8 +53,10 @@ const adapter = new class QQBotAdapter {
     }
 
     this.sep = ":"
-    if (process.platform === "win32") this.sep = ""
+    if (process.platform === "win32")
+      this.sep = ""
     this.bind_user = {}
+    this.appid = {}
   }
 
   async makeRecord(file) {
@@ -68,20 +69,21 @@ const adapter = new class QQBotAdapter {
         Bot.makeLog("error", ["Bot", i, "语音上传错误", file, err])
       }
     }
+    const buffer = await Bot.Buffer(file)
+    if (!Buffer.isBuffer(buffer)) return file
+    if (isSilk(buffer)) return buffer
 
-    const inputFile = path.join("temp", ulid())
-    const pcmFile = path.join("temp", ulid())
-
+    const convFile = path.join("temp", ulid())
     try {
-      await fs.writeFile(inputFile, await Bot.Buffer(file))
-      await Bot.exec(`ffmpeg -i "${inputFile}" -f s16le -ar 48000 -ac 1 "${pcmFile}"`)
-      file = Buffer.from((await encodeSilk(await fs.readFile(pcmFile), 48000)).data)
+      await fs.writeFile(convFile, buffer)
+      await Bot.exec(`ffmpeg -i "${convFile}" -f s16le -ar 48000 -ac 1 "${convFile}.pcm"`)
+      file = Buffer.from((await encodeSilk(await fs.readFile(`${convFile}.pcm`), 48000)).data)
     } catch (err) {
       Bot.makeLog("error", ["silk 转码错误", file, err])
     }
 
-    for (const i of [inputFile, pcmFile])
-      try { await fs.unlink(i) } catch (err) {}
+    for (const i of [convFile, `${convFile}.pcm`])
+      fs.unlink(i).catch(() => {})
 
     return file
   }
@@ -1231,9 +1233,12 @@ const adapter = new class QQBotAdapter {
       })},
 
       uin: id,
-      info: { id, ...opts },
-      get nickname() { return this.sdk.nickname },
-      get avatar() { return `https://q.qlogo.cn/g?b=qq&s=0&nk=${this.uin}` },
+      info: {
+        id, ...opts,
+        avatar: `https://q.qlogo.cn/g?b=qq&s=0&nk=${this.uin}`,
+      },
+      get nickname() { return this.info.username },
+      get avatar() { return this.info.avatar },
 
       version: {
         id: this.id,
@@ -1263,17 +1268,53 @@ const adapter = new class QQBotAdapter {
         return Bot.makeLog(i, args, id)
       }
 
-    await Bot[id].login()
+    try {
+      if (token[4] === "2") {
+        await Bot[id].sdk.sessionManager.getAccessToken()
+        Bot[id].login = () => this.appid[opts.appid] = Bot[id]
+        Bot[id].logout = () => delete this.appid[opts.appid]
+      }
+
+      await Bot[id].login()
+      Object.assign(Bot[id].info, await Bot[id].sdk.getSelfInfo())
+    } catch (err) {
+      Bot.makeLog("error", [`${this.name}(${this.id}) ${this.version} 连接失败`, err], id)
+      return false
+    }
 
     Bot[id].sdk.on("message", event => this.makeMessage(id, event))
     Bot[id].sdk.on("notice", event => this.makeNotice(id, event))
 
-    Bot.makeLog("mark", `${this.name}(${this.id}) ${this.version} 已连接`, id)
+    Bot.makeLog("mark", `${this.name}(${this.id}) ${this.version} ${Bot[id].nickname} 已连接`, id)
     Bot.em(`connect.${id}`, { self_id: id })
     return true
   }
 
+  async makeWebHookSign(req, secret) {
+    const { sign } = (await import("tweetnacl")).default
+    const { plain_token, event_ts } = req.body.d
+    while (secret.length < 32)
+      secret = secret.repeat(2).slice(0, 32)
+    const signature = Buffer.from(sign.detached(
+      Buffer.from(`${event_ts}${plain_token}`),
+      sign.keyPair.fromSeed(Buffer.from(secret)).secretKey,
+    )).toString("hex")
+    req.res.send({ plain_token, signature })
+  }
+
+  makeWebHook(req) {
+    const appid = req.headers["x-bot-appid"]
+    if (!(appid in this.appid))
+      return Bot.makeLog("warn", "找不到对应Bot", appid)
+    if ("plain_token" in req.body?.d)
+      return this.makeWebHookSign(req, this.appid[appid].info.secret)
+    if ("t" in req.body)
+      this.appid[appid].sdk.dispatchEvent(req.body.t, req.body)
+    req.res.sendStatus(200)
+  }
+
   async load() {
+    Bot.express.use(`/${this.name}`, this.makeWebHook.bind(this))
     for (const token of config.token)
       await Bot.sleep(5000, this.connect(token))
   }
@@ -1294,7 +1335,7 @@ export class QQBotAdapter extends plugin {
           permission: config.permission,
         },
         {
-          reg: "^#[Qq]+[Bb]ot设置[0-9]+:[0-9]+:.+:.+:[01]:[01]$",
+          reg: "^#[Qq]+[Bb]ot设置[0-9]+:[0-9]+:.+:.+:([01]:[01]|2)$",
           fnc: "Token",
           permission: config.permission,
         },

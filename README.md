@@ -20,7 +20,7 @@ TRSS-Yunzai QQBot 适配器 插件
 3. 打开：[QQ 开放平台](https://q.qq.com) 创建 Bot：  
 ① 创建机器人  
 ② 开发设置 → 得到 `机器人QQ号:AppID:Token:AppSecret`  
-4. 输入：`#QQBot设置机器人QQ号:AppID:Token:AppSecret:[01]:[01]`
+4. 输入：`#QQBot设置机器人QQ号:AppID:Token:AppSecret:[012]:[01]`
 
 ## 格式示例
 
@@ -30,8 +30,16 @@ TRSS-Yunzai QQBot 适配器 插件
 #QQBot设置114:514:1919:810:1:1
 ```
 
+- WebHook
+
+```
+#QQBot设置114:514:1919:810:2
+```
+
+公网 HTTPS 反代 url/QQBot 填入开放平台
+
 ## 使用教程
 
 - #QQBot账号
 - #QQBot设置 + `机器人QQ号:AppID:Token:AppSecret:是否群Bot:是否频道私域`（是1 否0）
-- #QQBotMD + `机器人QQ号:模板ID`
+- #QQBotMD + `机器人QQ号:raw`（需要原生MD按钮权限）

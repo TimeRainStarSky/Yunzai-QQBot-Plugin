@@ -3,10 +3,10 @@
   "type": "module",
   "author": "TimeRainStarSky",
   "dependencies": {
-    "@goodtools/protobuf-decoder": "^1.0.0",
     "qq-group-bot": "1.1.0",
     "qrcode": "^1.5.4",
-    "silk-wasm": "^3.6.1",
+    "silk-wasm": "^3.6.3",
+    "tweetnacl": "^1.0.3",
     "url-regex-safe": "^4.0.0"
   }
 }
