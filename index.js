@@ -473,47 +473,47 @@ const adapter = new class QQBotAdapter {
 
   async compressImage(file, targetSize, data) {
     try {
-      let buffer;
+      let buffer
       if (Buffer.isBuffer(file)) {
-        buffer = file;
+        buffer = file
       } else if (typeof file === 'string' && file.startsWith("base64://")) {
-        const base64Data = file.slice("base64://".length);
-        buffer = Buffer.from(base64Data, "base64");
+        const base64Data = file.slice("base64://".length)
+        buffer = Buffer.from(base64Data, "base64")
       } else {
-        buffer = await Bot.Buffer(file);
+        buffer = await Bot.Buffer(file)
       }
 
       if (!Buffer.isBuffer(buffer)) {
-        return file;
+        return file
       }
 
       if (buffer.length <= targetSize) {
-        return buffer;
+        return buffer
       }
 
-      let low = 10, high = 100, bestQuality = low, bestBuffer = null;
+      let low = 10, high = 100, bestQuality = low, bestBuffer = null
       while (low <= high) {
-        const mid = Math.floor((low + high) / 2);
-        const outputBuffer = await sharp(buffer).jpeg({ quality: mid }).toBuffer();
+        const mid = Math.floor((low + high) / 2)
+        const outputBuffer = await sharp(buffer).jpeg({ quality: mid }).toBuffer()
         if (outputBuffer.length > targetSize) {
-          high = mid - 1;
+          high = mid - 1
         } else {
-          bestQuality = mid;
-          bestBuffer = outputBuffer;
-          low = mid + 1;
+          bestQuality = mid
+          bestBuffer = outputBuffer
+          low = mid + 1
         }
       }
 
       if (!bestBuffer) {
-        bestQuality = 10;
-        bestBuffer = await sharp(buffer).jpeg({ quality: bestQuality }).toBuffer();
+        bestQuality = 10
+        bestBuffer = await sharp(buffer).jpeg({ quality: bestQuality }).toBuffer()
       }
 
-      Bot.makeLog("debug", ["图片压缩成功，新大小", bestBuffer.length, "质量", bestQuality], data.self_id);
-      return bestBuffer;
+      Bot.makeLog("debug", ["图片压缩成功，新大小", bestBuffer.length, "质量", bestQuality], data.self_id)
+      return bestBuffer
     } catch (err) {
-      Bot.makeLog("error", ["压缩图片失败", err], data.self_id);
-      return file;
+      Bot.makeLog("error", ["压缩图片失败", err], data.self_id)
+      return file
     }
   }
 
@@ -548,13 +548,13 @@ const adapter = new class QQBotAdapter {
             message = []
           }
 
-          const targetMB = config.imageTargetSize || 3.5;
-          const targetSize = targetMB * 1024 * 1024;
+          const targetMB = config.imageTargetSize || 3.5
+          const targetSize = targetMB * 1024 * 1024
 
           if (i.file) {
-            const buffer = await this.compressImage(i.file, targetSize, data);
+            const buffer = await this.compressImage(i.file, targetSize, data)
             if (Buffer.isBuffer(buffer)) {
-              i.file = "base64://" + buffer.toString("base64");
+              i.file = buffer
             }
           }
           break
