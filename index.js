@@ -545,7 +545,16 @@ const adapter = new class QQBotAdapter {
         }
       }
 
-      message.push(i)
+      // 剔除空文本的消息
+      if (i.type === "text") {
+        if (i.text && i.text.trim()) {
+          message.push(i)
+        } else {
+          continue
+        }
+      } else {
+        message.push(i)
+      }
     }
 
     if (message.length)
