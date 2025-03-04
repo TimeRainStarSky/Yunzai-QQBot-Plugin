@@ -471,6 +471,52 @@ const adapter = new class QQBotAdapter {
     return messages
   }
 
+  async compressImage(file, targetSize, data) {
+    try {
+      let buffer;
+      if (Buffer.isBuffer(file)) {
+        buffer = file;
+      } else if (typeof file === 'string' && file.startsWith("base64://")) {
+        const base64Data = file.slice("base64://".length);
+        buffer = Buffer.from(base64Data, "base64");
+      } else {
+        buffer = await Bot.Buffer(file);
+      }
+
+      if (!Buffer.isBuffer(buffer)) {
+        return file;
+      }
+
+      if (buffer.length <= targetSize) {
+        return buffer;
+      }
+
+      let low = 10, high = 100, bestQuality = low, bestBuffer = null;
+      while (low <= high) {
+        const mid = Math.floor((low + high) / 2);
+        const outputBuffer = await sharp(buffer).jpeg({ quality: mid }).toBuffer();
+        if (outputBuffer.length > targetSize) {
+          high = mid - 1;
+        } else {
+          bestQuality = mid;
+          bestBuffer = outputBuffer;
+          low = mid + 1;
+        }
+      }
+
+      if (!bestBuffer) {
+        bestQuality = 10;
+        bestBuffer = await sharp(buffer).jpeg({ quality: bestQuality }).toBuffer();
+      }
+
+      Bot.makeLog("debug", ["图片压缩成功，新大小", bestBuffer.length, "质量", bestQuality], data.self_id);
+      return bestBuffer;
+    } catch (err) {
+      Bot.makeLog("error", ["压缩图片失败", err], data.self_id);
+      return file;
+    }
+  }
+
   async makeMsg(data, msg) {
     const messages = [], button = []
     let message = [], reply
@@ -486,6 +532,8 @@ const adapter = new class QQBotAdapter {
           //i.user_id = i.qq?.replace?.(`${data.self_id}${this.sep}`, "")
           continue
         case "text":
+          if (!i.text || !i.text.trim()) continue
+          break
         case "face":
         case "ark":
         case "embed":
@@ -498,6 +546,16 @@ const adapter = new class QQBotAdapter {
           if (message.length) {
             messages.push(message)
             message = []
+          }
+
+          const targetMB = config.imageTargetSize || 3.5;
+          const targetSize = targetMB * 1024 * 1024;
+
+          if (i.file) {
+            const buffer = await this.compressImage(i.file, targetSize, data);
+            if (Buffer.isBuffer(buffer)) {
+              i.file = "base64://" + buffer.toString("base64");
+            }
           }
           break
         case "file":
@@ -547,47 +605,7 @@ const adapter = new class QQBotAdapter {
         }
       }
 
-      if (i.type === "image" && i.file && i.file.startsWith("base64://")) {
-        const base64Data = i.file.slice("base64://".length)
-        const buffer = Buffer.from(base64Data, "base64")
-        const targetMB = config.imageTargetSize || 3.5
-        const targetSize = targetMB * 1024 * 1024
-        if (buffer.length > targetSize) {
-          try {
-            let low = 10, high = 100, bestQuality = low, bestBuffer = null
-            while (low <= high) {
-              const mid = Math.floor((low + high) / 2)
-              const outputBuffer = await sharp(buffer).jpeg({ quality: mid }).toBuffer()
-              if (outputBuffer.length > targetSize) {
-                high = mid - 1
-              } else {
-                bestQuality = mid
-                bestBuffer = outputBuffer
-                low = mid + 1
-              }
-            }
-            if (!bestBuffer) {
-              bestQuality = 10
-              bestBuffer = await sharp.default(buffer).jpeg({ quality: bestQuality }).toBuffer()
-            }
-            i.file = "base64://" + bestBuffer.toString("base64")
-            Bot.makeLog("debug", ["图片压缩成功，新大小", bestBuffer.length, "质量", bestQuality], data.self_id)
-          } catch (err) {
-            Bot.makeLog("error", ["压缩图片失败", err], data.self_id)
-          }
-        }
-      }
-
-      // 剔除空文本的消息
-      if (i.type === "text") {
-        if (i.text && i.text.trim()) {
-          message.push(i)
-        } else {
-          continue
-        }
-      } else {
-        message.push(i)
-      }
+      message.push(i)
     }
 
     if (message.length)
