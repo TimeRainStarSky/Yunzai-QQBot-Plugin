@@ -9,6 +9,7 @@ import imageSize from "image-size"
 import urlRegexSafe from "url-regex-safe"
 import { encode as encodeSilk, isSilk } from "silk-wasm"
 import { Bot as QQBot } from "qq-group-bot"
+import sharp from "sharp"
 
 const { config, configSave } = await makeConfig("QQBot", {
   tips: "",
@@ -17,6 +18,7 @@ const { config, configSave } = await makeConfig("QQBot", {
   toCallback: true,
   toBotUpload: true,
   hideGuildRecall: false,
+  imageTargetSize: 3.5,
   markdown: {
     template: "abcdefghij",
   },
@@ -469,6 +471,52 @@ const adapter = new class QQBotAdapter {
     return messages
   }
 
+  async compressImage(file, targetSize, data) {
+    try {
+      let buffer
+      if (Buffer.isBuffer(file)) {
+        buffer = file
+      } else if (typeof file === 'string' && file.startsWith("base64://")) {
+        const base64Data = file.slice("base64://".length)
+        buffer = Buffer.from(base64Data, "base64")
+      } else {
+        buffer = await Bot.Buffer(file)
+      }
+
+      if (!Buffer.isBuffer(buffer)) {
+        return file
+      }
+
+      if (buffer.length <= targetSize) {
+        return buffer
+      }
+
+      let low = 10, high = 100, bestQuality = low, bestBuffer = null
+      while (low <= high) {
+        const mid = Math.floor((low + high) / 2)
+        const outputBuffer = await sharp(buffer).jpeg({ quality: mid }).toBuffer()
+        if (outputBuffer.length > targetSize) {
+          high = mid - 1
+        } else {
+          bestQuality = mid
+          bestBuffer = outputBuffer
+          low = mid + 1
+        }
+      }
+
+      if (!bestBuffer) {
+        bestQuality = 10
+        bestBuffer = await sharp(buffer).jpeg({ quality: bestQuality }).toBuffer()
+      }
+
+      Bot.makeLog("debug", ["图片压缩成功，新大小", bestBuffer.length, "质量", bestQuality], data.self_id)
+      return bestBuffer
+    } catch (err) {
+      Bot.makeLog("error", ["压缩图片失败", err], data.self_id)
+      return file
+    }
+  }
+
   async makeMsg(data, msg) {
     const messages = [], button = []
     let message = [], reply
@@ -484,6 +532,8 @@ const adapter = new class QQBotAdapter {
           //i.user_id = i.qq?.replace?.(`${data.self_id}${this.sep}`, "")
           continue
         case "text":
+          if (!i.text || !i.text.trim()) continue
+          break
         case "face":
         case "ark":
         case "embed":
@@ -496,6 +546,16 @@ const adapter = new class QQBotAdapter {
           if (message.length) {
             messages.push(message)
             message = []
+          }
+
+          const targetMB = config.imageTargetSize || 3.5
+          const targetSize = targetMB * 1024 * 1024
+
+          if (i.file) {
+            const buffer = await this.compressImage(i.file, targetSize, data)
+            if (Buffer.isBuffer(buffer)) {
+              i.file = buffer
+            }
           }
           break
         case "file":

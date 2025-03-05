@@ -7,6 +7,7 @@
     "qrcode": "^1.5.4",
     "silk-wasm": "^3.6.3",
     "tweetnacl": "^1.0.3",
-    "url-regex-safe": "^4.0.0"
+    "url-regex-safe": "^4.0.0",
+    "sharp": "^0.32.6"
   }
 }
