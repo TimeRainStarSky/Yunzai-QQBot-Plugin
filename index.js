@@ -1328,7 +1328,7 @@ const adapter = new class QQBotAdapter {
     return true
   }
 
-  async makeWebHookSign(req, secret) {
+  async makeWebHookSign(id, req, secret) {
     const { sign } = (await import("tweetnacl")).default
     const { plain_token, event_ts } = req.body.d
     while (secret.length < 32)
@@ -1337,15 +1337,16 @@ const adapter = new class QQBotAdapter {
       Buffer.from(`${event_ts}${plain_token}`),
       sign.keyPair.fromSeed(Buffer.from(secret)).secretKey,
     )).toString("hex")
+    Bot.makeLog("debug", ["QQBot 签名生成", { plain_token, signature }], id)
     req.res.send({ plain_token, signature })
   }
 
   makeWebHook(req) {
     const appid = req.headers["x-bot-appid"]
     if (!(appid in this.appid))
-      return Bot.makeLog("warn", "找不到对应Bot", appid)
+      return Bot.makeLog("warn", "找不到对应 QQBot", appid)
     if ("plain_token" in req.body?.d)
-      return this.makeWebHookSign(req, this.appid[appid].info.secret)
+      return this.makeWebHookSign(this.appid[appid].uin, req, this.appid[appid].info.secret)
     if ("t" in req.body)
       this.appid[appid].sdk.dispatchEvent(req.body.t, req.body)
     req.res.sendStatus(200)
@@ -1353,6 +1354,7 @@ const adapter = new class QQBotAdapter {
 
   async load() {
     Bot.express.use(`/${this.name}`, this.makeWebHook.bind(this))
+    Bot.express.quiet.push(`/${this.name}`)
     for (const token of config.token)
       await Bot.sleep(5000, this.connect(token))
   }
