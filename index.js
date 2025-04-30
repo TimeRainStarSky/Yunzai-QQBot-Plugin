@@ -573,7 +573,7 @@ const adapter = new class QQBotAdapter {
       if (i.type === "text" && i.text) {
         const match = i.text.match(this.toQRCodeRegExp)
         if (match) for (const url of match) {
-          const msg = segment.image(await Bot.fileToUrl(await this.makeQRCode(url)))
+          const msg = segment.image(await this.makeQRCode(url))
           if (message.length) {
             messages.push(message)
             message = []
