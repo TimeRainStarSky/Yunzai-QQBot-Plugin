@@ -255,7 +255,7 @@ const adapter = new (class QQBotAdapter {
     return msgs.join("\n")
   }
 
-  async makeRawMarkdownMsg(data, msg, keyboard) {
+  async makeRawMarkdownMsg(data, msg, keyboard, nested) {
     const messages = [],
       button = []
     let content = "",
@@ -301,13 +301,11 @@ const adapter = new (class QQBotAdapter {
           else content += this.makeTextChains(data, i.data)
           break
         case "reply":
-          if (i.id.startsWith("event_"))
-            reply = { type: "reply", event_id: i.id.replace(/^event_/, "") }
-          else reply = i
+          reply = i
           continue
         case "node":
           for (const { message } of i.data)
-            messages.push(...(await this.makeRawMarkdownMsg(data, message)))
+            messages.push(...(await this.makeRawMarkdownMsg(data, message, keyboard, true)))
           continue
         case "raw":
           messages.push(Array.isArray(i.data) ? i.data : [i.data])
@@ -328,11 +326,15 @@ const adapter = new (class QQBotAdapter {
         messages.push([{ type: "markdown", content: " " }, ...button.splice(0, 5)])
     }
 
-    if (reply)
+    if (!reply && !nested && data.message_id) reply = segment.reply(data.message_id)
+    if (reply) {
+      if (reply.id.startsWith("event_"))
+        reply = { type: "reply", event_id: reply.id.replace(/^event_/, "") }
       for (const i in messages) {
         if (Array.isArray(messages[i])) messages[i].unshift(reply)
         else messages[i] = [reply, messages[i]]
       }
+    }
     return messages
   }
 
@@ -401,7 +403,7 @@ const adapter = new (class QQBotAdapter {
     return template
   }
 
-  async makeMarkdownMsg(data, msg) {
+  async makeMarkdownMsg(data, msg, nested) {
     const messages = [],
       templates = [[]]
     let content = "",
@@ -455,13 +457,11 @@ const adapter = new (class QQBotAdapter {
           content += this.makeTextChains(data, i.data)
           break
         case "reply":
-          if (i.id.startsWith("event_"))
-            reply = { type: "reply", event_id: i.id.replace(/^event_/, "") }
-          else reply = i
+          reply = i
           continue
         case "node":
           for (const { message } of i.data)
-            messages.push(...(await this.makeMarkdownMsg(data, message)))
+            messages.push(...(await this.makeMarkdownMsg(data, message, true)))
           continue
         case "raw":
           messages.push(Array.isArray(i.data) ? i.data : [i.data])
@@ -481,7 +481,14 @@ const adapter = new (class QQBotAdapter {
     if (content) template.push(content)
     messages.push(...this.makeMarkdownTemplate(data, templates))
 
-    if (reply) for (const i of messages) i.unshift(reply)
+    if (!reply && !nested && data.message_id) reply = segment.reply(data.message_id)
+    if (reply)
+      for (const i of messages)
+        i.unshift(
+          reply.id.startsWith("event_")
+            ? { type: "reply", event_id: reply.id.replace(/^event_/, "") }
+            : reply,
+        )
     return messages
   }
 
@@ -513,7 +520,7 @@ const adapter = new (class QQBotAdapter {
     }
   }
 
-  async makeMsg(data, msg) {
+  async makeMsg(data, msg, nested) {
     const messages = [],
       button = []
     let message = [],
@@ -551,9 +558,7 @@ const adapter = new (class QQBotAdapter {
           i = { type: "text", text: `文件：${i.file}` }
           break
         case "reply":
-          if (i.id.startsWith("event_"))
-            reply = { type: "reply", event_id: i.id.replace(/^event_/, "") }
-          else reply = i
+          reply = i
           continue
         case "markdown":
           if (typeof i.data === "object") i = { type: "markdown", ...i.data }
@@ -563,7 +568,8 @@ const adapter = new (class QQBotAdapter {
           //button.push(...this.makeButtons(data, i.data))
           continue
         case "node":
-          for (const { message } of i.data) messages.push(...(await this.makeMsg(data, message)))
+          for (const { message } of i.data)
+            messages.push(...(await this.makeMsg(data, message, true)))
           continue
         case "raw":
           if (Array.isArray(i.data)) {
@@ -603,7 +609,14 @@ const adapter = new (class QQBotAdapter {
         },
       ])
 
-    if (reply) for (const i of messages) i.unshift(reply)
+    if (!reply && !nested && data.message_id) reply = segment.reply(data.message_id)
+    if (reply)
+      for (const i of messages)
+        i.unshift(
+          reply.id.startsWith("event_")
+            ? { type: "reply", event_id: reply.id.replace(/^event_/, "") }
+            : reply,
+        )
     return messages
   }
 
@@ -643,15 +656,15 @@ const adapter = new (class QQBotAdapter {
     return rets
   }
 
-  sendFriendMsg(data, msg, event) {
-    return this.sendMsg(data, msg => data.bot.sdk.sendPrivateMessage(data.user_id, msg, event), msg)
+  sendFriendMsg(data, msg) {
+    return this.sendMsg(data, msg => data.bot.sdk.sendPrivateMessage(data.user_id, msg), msg)
   }
 
-  sendGroupMsg(data, msg, event) {
-    return this.sendMsg(data, msg => data.bot.sdk.sendGroupMessage(data.group_id, msg, event), msg)
+  sendGroupMsg(data, msg) {
+    return this.sendMsg(data, msg => data.bot.sdk.sendGroupMessage(data.group_id, msg), msg)
   }
 
-  async makeGuildMsg(data, msg) {
+  async makeGuildMsg(data, msg, nested) {
     const messages = []
     let message = [],
       reply
@@ -689,7 +702,7 @@ const adapter = new (class QQBotAdapter {
           continue
         case "node":
           for (const { message } of i.data)
-            messages.push(...(await this.makeGuildMsg(data, message)))
+            messages.push(...(await this.makeGuildMsg(data, message, true)))
           continue
         case "raw":
           if (Array.isArray(i.data)) {
@@ -718,7 +731,14 @@ const adapter = new (class QQBotAdapter {
     }
 
     if (message.length) messages.push(message)
-    if (reply) for (const i of messages) i.unshift(reply)
+    if (!reply && !nested && data.message_id) reply = segment.reply(data.message_id)
+    if (reply)
+      for (const i of messages)
+        i.unshift(
+          reply.id.startsWith("event_")
+            ? { type: "reply", event_id: reply.id.replace(/^event_/, "") }
+            : reply,
+        )
     return messages
   }
 
@@ -750,7 +770,7 @@ const adapter = new (class QQBotAdapter {
     return rets
   }
 
-  async sendDirectMsg(data, msg, event) {
+  async sendDirectMsg(data, msg) {
     if (!data.guild_id) {
       if (!data.src_guild_id) {
         Bot.makeLog(
@@ -768,19 +788,11 @@ const adapter = new (class QQBotAdapter {
         ...dms,
       })
     }
-    return this.sendGMsg(
-      data,
-      msg => data.bot.sdk.sendDirectMessage(data.guild_id, msg, event),
-      msg,
-    )
+    return this.sendGMsg(data, msg => data.bot.sdk.sendDirectMessage(data.guild_id, msg), msg)
   }
 
-  sendGuildMsg(data, msg, event) {
-    return this.sendGMsg(
-      data,
-      msg => data.bot.sdk.sendGuildMessage(data.channel_id, msg, event),
-      msg,
-    )
+  sendGuildMsg(data, msg) {
+    return this.sendGMsg(data, msg => data.bot.sdk.sendGuildMessage(data.channel_id, msg), msg)
   }
 
   async recallMsg(data, recall, message_id) {
@@ -949,7 +961,6 @@ const adapter = new (class QQBotAdapter {
           user_id: event.sender.user_id,
         },
         msg,
-        { id: data.message_id },
       )
     await this.setFriendMap(data)
   }
@@ -972,7 +983,6 @@ const adapter = new (class QQBotAdapter {
           group_id: event.group_id,
         },
         msg,
-        { id: data.message_id },
       )
     data.message.unshift({ type: "at", qq: data.self_id })
     await this.setGroupMap(data)
@@ -1004,7 +1014,6 @@ const adapter = new (class QQBotAdapter {
           channel_id: event.channel_id,
         },
         msg,
-        { id: data.message_id },
       )
     await this.setFriendMap(data)
   }
@@ -1035,7 +1044,6 @@ const adapter = new (class QQBotAdapter {
           channel_id: event.channel_id,
         },
         msg,
-        { id: data.message_id },
       )
     await this.setFriendMap(data)
     await this.setGroupMap(data)
@@ -1046,6 +1054,7 @@ const adapter = new (class QQBotAdapter {
     await data.bot.fl.set(data.user_id, {
       ...data.bot.fl.get(data.user_id),
       ...data.sender,
+      message_id: data.message_id,
     })
   }
 
@@ -1054,6 +1063,7 @@ const adapter = new (class QQBotAdapter {
     await data.bot.gl.set(data.group_id, {
       ...data.bot.gl.get(data.group_id),
       group_id: data.group_id,
+      message_id: data.message_id,
     })
     let gml = data.bot.gml.get(data.group_id)
     if (!gml) {
@@ -1218,7 +1228,6 @@ const adapter = new (class QQBotAdapter {
     if (callback) {
       if (callback.self_id) return this.makeBotCallback(id, event, callback)
       if (!event.group_id && callback.group_id) event.group_id = callback.group_id
-      data.message_id = callback.id
       if (callback.message_id.length) {
         for (const id of callback.message_id) data.message.push({ type: "reply", id })
         data.raw_message += `[回复：${callback.message_id}]`
@@ -1244,8 +1253,7 @@ const adapter = new (class QQBotAdapter {
         data.message_type = "private"
         Bot.makeLog("info", [`好友按钮点击事件：[${data.user_id}]`, data.raw_message], data.self_id)
 
-        data.reply = msg =>
-          this.sendFriendMsg({ ...data, user_id: event.operator_id }, msg, { id: data.message_id })
+        data.reply = msg => this.sendFriendMsg({ ...data, user_id: event.operator_id }, msg)
         await this.setFriendMap(data)
         break
       case "group":
@@ -1256,8 +1264,7 @@ const adapter = new (class QQBotAdapter {
           data.self_id,
         )
 
-        data.reply = msg =>
-          this.sendGroupMsg({ ...data, group_id: event.group_id }, msg, { id: data.message_id })
+        data.reply = msg => this.sendGroupMsg({ ...data, group_id: event.group_id }, msg)
         await this.setGroupMap(data)
         break
       case "guild":
