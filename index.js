@@ -129,6 +129,7 @@ const adapter = new (class QQBotAdapter {
   }
 
   async makeMarkdownImage(data, file, summary = "图片") {
+    if (sharp) file = await this.compressImage(data, file)
     const buffer = await Bot.Buffer(file)
     const image = (await this.makeBotImage(buffer)) || { url: await Bot.fileToUrl(file) }
 
