@@ -627,14 +627,12 @@ const adapter = new (class QQBotAdapter {
         }
     }
 
-    if (config.markdown[data.self_id]) {
-      if (config.markdown[data.self_id] === "legacy") msgs = await this.makeMsg(data, msg)
-      else if (config.markdown[data.self_id] === "raw")
-        msgs = await this.makeRawMarkdownMsg(data, msg, true)
-      else msgs = await this.makeMarkdownMsg(data, msg)
-    } else {
+    if (!config.markdown[data.self_id] || config.markdown[data.self_id] === "raw")
+      msgs = await this.makeRawMarkdownMsg(data, msg, true)
+    else if (config.markdown[data.self_id] === "legacy") msgs = await this.makeMsg(data, msg)
+    else if (config.markdown[data.self_id] === "inline")
       msgs = await this.makeRawMarkdownMsg(data, msg)
-    }
+    else msgs = await this.makeMarkdownMsg(data, msg)
 
     if ((await sendMsg()) === false) {
       msgs = await this.makeMsg(data, msg)

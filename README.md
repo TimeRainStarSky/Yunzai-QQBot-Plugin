@@ -47,4 +47,4 @@ TRSS-Yunzai QQBot 适配器 插件
 
 - #QQBot账号
 - #QQBot设置 + `机器人QQ号:AppID:Token:AppSecret:是否群Bot:是否频道私域`（是1 否0）
-- #QQBotMD + `机器人QQ号:raw/legacy`（原生MD按钮消息/普通消息）
+- #QQBotMD + `机器人QQ号:raw/inline/legacy`（MD按钮消息/MD消息/普通消息）
