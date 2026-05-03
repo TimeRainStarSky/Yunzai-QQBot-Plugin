@@ -43,8 +43,11 @@ TRSS-Yunzai QQBot 适配器 插件
 - 使用公网地址，填入 `config/config/server.yaml:url`，浏览器打开 url，后台日志应显示访问请求
 - 切换普通消息，输入 `#QQBotMD机器人QQ号:legacy`
 
+如果出现加载失败，可尝试限制图片大小 `#QQBot图片限制2/1/0.5...`
+
 ## 使用教程
 
 - #QQBot账号
 - #QQBot设置 + `机器人QQ号:AppID:Token:AppSecret:是否群Bot:是否频道私域`（是1 否0）
 - #QQBotMD + `机器人QQ号:raw/inline/legacy`（MD按钮消息/MD消息/普通消息）
+- #QQBot图片限制 + `数字`（MB，默认3）

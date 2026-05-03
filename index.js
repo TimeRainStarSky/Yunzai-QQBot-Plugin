@@ -1336,9 +1336,9 @@ const adapter = new (class QQBotAdapter {
       ],
     }
 
-    if (Number(token[4])) opts.intents.push("GROUP_AT_MESSAGE_CREATE", "C2C_MESSAGE_CREATE")
+    if (+token[4]) opts.intents.push("GROUP_AT_MESSAGE_CREATE", "C2C_MESSAGE_CREATE")
 
-    if (Number(token[5])) opts.intents.push("GUILD_MESSAGES")
+    if (+token[5]) opts.intents.push("GUILD_MESSAGES")
     else opts.intents.push("PUBLIC_GUILD_MESSAGES")
 
     Bot[id] = {
@@ -1481,6 +1481,11 @@ export class QQBotAdapter extends plugin {
           permission: config.permission,
         },
         {
+          reg: "^#[Qq]+[Bb]ot图片限制[0-9]+$",
+          fnc: "ImageLength",
+          permission: config.permission,
+        },
+        {
           reg: "^#[Qq]+[Bb]ot绑定用户.+$",
           fnc: "BindUser",
         },
@@ -1506,10 +1511,10 @@ export class QQBotAdapter extends plugin {
         return false
       }
     }
-    await configSave()
+    return configSave()
   }
 
-  async Markdown() {
+  Markdown() {
     let token = this.e.msg
       .replace(/^#[Qq]+[Bb]ot[Mm](ark)?[Dd](own)?/, "")
       .trim()
@@ -1518,7 +1523,16 @@ export class QQBotAdapter extends plugin {
     token = token.join(":")
     this.reply(`Bot ${bot_id} Markdown 模板已设置为 ${token}`, true)
     config.markdown[bot_id] = token
-    await configSave()
+    return configSave()
+  }
+
+  ImageLength() {
+    const imageLength = +this.e.msg.replace(/^#[Qq]+[Bb]ot图片限制/, "").trim()
+    if (!(imageLength > 0)) return this.reply("请输入正确数字", true)
+    if (!sharp) return this.reply("请检查 sharp 是否正确安装", true)
+    this.reply(`图片大小已限制为 ${imageLength}MB`, true)
+    config.imageLength = imageLength
+    return configSave()
   }
 
   BindUser() {
