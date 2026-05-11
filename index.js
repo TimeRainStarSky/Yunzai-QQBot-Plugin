@@ -1481,7 +1481,7 @@ export class QQBotAdapter extends plugin {
           permission: config.permission,
         },
         {
-          reg: "^#[Qq]+[Bb]ot图片限制[0-9]+$",
+          reg: "^#[Qq]+[Bb]ot图片限制.+$",
           fnc: "ImageLength",
           permission: config.permission,
         },
