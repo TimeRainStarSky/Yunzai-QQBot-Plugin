@@ -330,7 +330,8 @@ const adapter = new (class QQBotAdapter {
         messages.push([{ type: "markdown", content: " " }, ...button.splice(0, 5)])
     }
 
-    if (!reply && !nested && data.message_id) reply = segment.reply(data.message_id)
+    if (!reply && !nested && Date.now() / 1000 - data.time < 300)
+      reply = segment.reply(data.message_id)
     if (reply) {
       if (reply.id.startsWith("event_"))
         reply = { type: "reply", event_id: reply.id.replace(/^event_/, "") }
@@ -485,7 +486,8 @@ const adapter = new (class QQBotAdapter {
     if (content) template.push(content)
     messages.push(...this.makeMarkdownTemplate(data, templates))
 
-    if (!reply && !nested && data.message_id) reply = segment.reply(data.message_id)
+    if (!reply && !nested && Date.now() / 1000 - data.time < 300)
+      reply = segment.reply(data.message_id)
     if (reply)
       for (const i of messages)
         i.unshift(
@@ -613,7 +615,8 @@ const adapter = new (class QQBotAdapter {
         },
       ])
 
-    if (!reply && !nested && data.message_id) reply = segment.reply(data.message_id)
+    if (!reply && !nested && Date.now() / 1000 - data.time < 300)
+      reply = segment.reply(data.message_id)
     if (reply)
       for (const i of messages)
         i.unshift(
@@ -735,7 +738,8 @@ const adapter = new (class QQBotAdapter {
     }
 
     if (message.length) messages.push(message)
-    if (!reply && !nested && data.message_id) reply = segment.reply(data.message_id)
+    if (!reply && !nested && Date.now() / 1000 - data.time < 300)
+      reply = segment.reply(data.message_id)
     if (reply)
       for (const i of messages)
         i.unshift(
@@ -1058,6 +1062,7 @@ const adapter = new (class QQBotAdapter {
     await data.bot.fl.set(data.user_id, {
       ...data.bot.fl.get(data.user_id),
       ...data.sender,
+      time: data.time,
       message_id: data.message_id,
     })
   }
@@ -1067,6 +1072,7 @@ const adapter = new (class QQBotAdapter {
     await data.bot.gl.set(data.group_id, {
       ...data.bot.gl.get(data.group_id),
       group_id: data.group_id,
+      time: data.time,
       message_id: data.message_id,
     })
     let gml = data.bot.gml.get(data.group_id)
@@ -1089,6 +1095,7 @@ const adapter = new (class QQBotAdapter {
       message_type: event.message_type,
       sub_type: event.sub_type,
       message_id: event.message_id,
+      time: event.timestamp,
       get user_id() {
         return this.sender.user_id
       },
