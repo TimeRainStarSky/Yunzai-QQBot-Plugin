@@ -8,7 +8,10 @@ import { ulid } from "ulid"
 import imageSize from "image-size"
 import urlRegexSafe from "url-regex-safe"
 import { encode as encodeSilk, isSilk } from "silk-wasm"
-import { Bot as QQBot, ReceiverMode } from "qq-official-bot"
+import { Bot as QQBot } from "qq-group-bot"
+
+import { QQEvent } from "qq-group-bot/lib/event/index.js"
+QQEvent.GROUP_MESSAGE_CREATE = QQEvent.GROUP_AT_MESSAGE_CREATE
 
 const { config, configSave } = await makeConfig(
   "QQBot",
@@ -225,7 +228,7 @@ const adapter = new (class QQBotAdapter {
         button = this.makeButton(data, button, (random + msgs.length + buttons.length) % 2)
         if (button) buttons.push(button)
       }
-      if (buttons.length) msgs.push({ type: "button", data: { buttons }})
+      if (buttons.length) msgs.push({ type: "button", buttons })
     }
     return msgs
   }
@@ -263,13 +266,13 @@ const adapter = new (class QQBotAdapter {
       reply
 
     for (let i of Array.isArray(msg) ? msg : [msg]) {
-      if (typeof i === "object") i = { type: i.type, data: { ...i, type: undefined } }
-      else i = { type: "text", data: { text: Bot.String(i) }}
+      if (typeof i === "object") i = { ...i }
+      else i = { type: "text", text: Bot.String(i) }
 
       switch (i.type) {
         case "record":
           i.type = "audio"
-          i.data.file = await this.makeRecord(i.data.file)
+          i.file = await this.makeRecord(i.file)
         case "video":
         case "face":
         case "ark":
@@ -277,46 +280,46 @@ const adapter = new (class QQBotAdapter {
           messages.push([i])
           break
         case "file":
-          if (i.data.file) i.data.file = await Bot.fileToUrl(i.data.file, i)
-          content += await this.makeRawMarkdownText(data, `文件：${i.data.file}`, keyboard && button)
+          if (i.file) i.file = await Bot.fileToUrl(i.file, i)
+          content += await this.makeRawMarkdownText(data, `文件：${i.file}`, keyboard && button)
           break
         case "at":
-          if (i.data.qq === "all") content += "<qqbot-at-everyone />"
+          if (i.qq === "all") content += "<qqbot-at-everyone />"
           else
-            content += `<qqbot-at-user id="${i.data.qq?.replace?.(`${data.self_id}${this.sep}`, "")}" />`
+            content += `<qqbot-at-user id="${i.qq?.replace?.(`${data.self_id}${this.sep}`, "")}" />`
           break
         case "text":
-          content += await this.makeRawMarkdownText(data, i.data.text, keyboard && button)
+          content += await this.makeRawMarkdownText(data, i.text, keyboard && button)
           break
         case "image": {
-          const { des, url } = await this.makeMarkdownImage(data, i.data.file, i.data.summary)
+          const { des, url } = await this.makeMarkdownImage(data, i.file, i.summary)
           content += `${des}${url}`
           break
         }
         case "markdown":
-          if (typeof i.data.data === "object") messages.push([{ type: "markdown", data: i.data }])
-          else content += i.data.data
+          if (typeof i.data === "object") messages.push([{ type: "markdown", ...i.data }])
+          else content += i.data
           break
         case "button":
-          if (keyboard) button.push(...this.makeButtons(data, i.data.data))
-          else content += this.makeTextChains(data, i.data.data)
+          if (keyboard) button.push(...this.makeButtons(data, i.data))
+          else content += this.makeTextChains(data, i.data)
           break
         case "reply":
           reply = i
           continue
         case "node":
-          for (const { message } of i.data.data)
+          for (const { message } of i.data)
             messages.push(...(await this.makeRawMarkdownMsg(data, message, keyboard, true)))
           continue
         case "raw":
-          messages.push(Array.isArray(i.data.data) ? i.data.data : [i.data.data])
+          messages.push(Array.isArray(i.data) ? i.data : [i.data])
           break
         default:
           content += await this.makeRawMarkdownText(data, Bot.String(i), keyboard && button)
       }
     }
 
-    if (content) messages.unshift([{ type: "markdown", data: { content } }])
+    if (content) messages.unshift([{ type: "markdown", content }])
 
     if (button.length) {
       for (const i of messages) {
@@ -324,13 +327,13 @@ const adapter = new (class QQBotAdapter {
         if (!button.length) break
       }
       while (button.length)
-        messages.push([{ type: "markdown", data: { content: " " }}, ...button.splice(0, 5)])
+        messages.push([{ type: "markdown", content: " " }, ...button.splice(0, 5)])
     }
 
-    if (!reply && !nested && data.message_id) reply = { type: "reply", data: {id: data.message_id}}
+    if (!reply && !nested && data.message_id) reply = segment.reply(data.message_id)
     if (reply) {
-      if (reply.data.id.startsWith("event_"))
-        reply = { type: "reply", data: {event_id: reply.data.id.replace(/^event_/, "") }}
+      if (reply.id.startsWith("event_"))
+        reply = { type: "reply", event_id: reply.id.replace(/^event_/, "") }
       for (const i in messages) {
         if (Array.isArray(messages[i])) messages[i].unshift(reply)
         else messages[i] = [reply, messages[i]]
@@ -383,8 +386,8 @@ const adapter = new (class QQBotAdapter {
       msgs.push([
         {
           type: "markdown",
-          data: {custom_template_id: config.markdown[data.self_id],
-          params,}
+          custom_template_id: config.markdown[data.self_id],
+          params,
         },
       ])
     }
@@ -412,13 +415,13 @@ const adapter = new (class QQBotAdapter {
       template = templates[0]
 
     for (let i of Array.isArray(msg) ? msg : [msg]) {
-      if (typeof i === "object") i = { type: i.type, data: { ...i, type: undefined } }
-      else i = { type: "text", data: { text: Bot.String(i) }}
+      if (typeof i === "object") i = { ...i }
+      else i = { type: "text", text: Bot.String(i) }
 
       switch (i.type) {
         case "record":
           i.type = "audio"
-          i.data.file = await this.makeRecord(i.data.file)
+          i.file = await this.makeRecord(i.file)
         case "video":
         case "face":
         case "ark":
@@ -426,16 +429,16 @@ const adapter = new (class QQBotAdapter {
           messages.push([i])
           break
         case "file":
-          if (i.data.file) i.data.file = await Bot.fileToUrl(i.data.file, i)
-          content += this.makeTextChain(data, { text: `文件：${i.data.name || i.data.file}`, link: i.data.file })
+          if (i.file) i.file = await Bot.fileToUrl(i.file, i)
+          content += this.makeTextChain(data, { text: `文件：${i.name || i.file}`, link: i.file })
           break
         case "at":
-          if (i.data.qq === "all") content += "<qqbot-at-everyone />"
+          if (i.qq === "all") content += "<qqbot-at-everyone />"
           else
-            content += `<qqbot-at-user id="${i.data.qq?.replace?.(`${data.self_id}${this.sep}`, "")}" />`
+            content += `<qqbot-at-user id="${i.qq?.replace?.(`${data.self_id}${this.sep}`, "")}" />`
           break
         case "text": {
-          const [text, temp] = this.makeMarkdownText(data, i.data.text, content)
+          const [text, temp] = this.makeMarkdownText(data, i.text, content)
           if (Array.isArray(temp)) {
             template = this.makeMarkdownTemplatePush(temp, template, templates)
             content = text
@@ -445,27 +448,27 @@ const adapter = new (class QQBotAdapter {
           break
         }
         case "image": {
-          const { des, url } = await this.makeMarkdownImage(data, i.data.file, i.data.summary)
+          const { des, url } = await this.makeMarkdownImage(data, i.file, i.summary)
           template = this.makeMarkdownTemplatePush([[content, des]], template, templates)
           content = url
           break
         }
         case "markdown":
-          if (typeof i.data.data === "object") messages.push([{ type: "markdown", data: i.data }])
-          else content += i.data.data
+          if (typeof i.data === "object") messages.push([{ type: "markdown", ...i.data }])
+          else content += i.data
           break
         case "button":
-          content += this.makeTextChains(data, i.data.data)
+          content += this.makeTextChains(data, i.data)
           break
         case "reply":
           reply = i
           continue
         case "node":
-          for (const { message } of i.data.data)
+          for (const { message } of i.data)
             messages.push(...(await this.makeMarkdownMsg(data, message, true)))
           continue
         case "raw":
-          messages.push(Array.isArray(i.data.data) ? i.data.data : [i.data.data])
+          messages.push(Array.isArray(i.data) ? i.data : [i.data])
           break
         default: {
           const [text, temp] = this.makeMarkdownText(data, Bot.String(i), content)
@@ -482,12 +485,12 @@ const adapter = new (class QQBotAdapter {
     if (content) template.push(content)
     messages.push(...this.makeMarkdownTemplate(data, templates))
 
-    if (!reply && !nested && data.message_id) reply = { type: "reply", data: {id: data.message_id}}
+    if (!reply && !nested && data.message_id) reply = segment.reply(data.message_id)
     if (reply)
       for (const i of messages)
         i.unshift(
-          reply.data.id.startsWith("event_")
-            ? { type: "reply", data: {event_id: reply.data.id.replace(/^event_/, "") }}
+          reply.id.startsWith("event_")
+            ? { type: "reply", event_id: reply.id.replace(/^event_/, "") }
             : reply,
         )
     return messages
@@ -528,15 +531,15 @@ const adapter = new (class QQBotAdapter {
       reply
 
     for (let i of Array.isArray(msg) ? msg : [msg]) {
-      if (typeof i === "object") i = { type: i.type, data: { ...i, type: undefined } }
-      else i = { type: "text", data: { text: Bot.String(i) }}
+      if (typeof i === "object") i = { ...i }
+      else i = { type: "text", text: Bot.String(i) }
 
       switch (i.type) {
         case "at":
-          //i.data.user_id = i.data.qq?.replace?.(`${data.self_id}${this.sep}`, "")
+          //i.user_id = i.qq?.replace?.(`${data.self_id}${this.sep}`, "")
           continue
         case "text":
-          if (!i.data.text || !i.data.text.trim()) continue
+          if (!i.text || !i.text.trim()) continue
           break
         case "face":
         case "ark":
@@ -544,7 +547,7 @@ const adapter = new (class QQBotAdapter {
           break
         case "record":
           i.type = "audio"
-          i.data.file = await this.makeRecord(i.data.file)
+          i.file = await this.makeRecord(i.file)
         case "video":
         case "image":
           if (message.length) {
@@ -552,39 +555,39 @@ const adapter = new (class QQBotAdapter {
             message = []
           }
 
-          if (sharp && i.data.file) i.data.file = await this.compressImage(data, i.data.file)
+          if (sharp && i.file) i.file = await this.compressImage(data, i.file)
           break
         case "file":
-          if (i.data.file) i.data.file = await Bot.fileToUrl(i.data.file, i.data)
-          i = { type: "text", text: `文件：${i.data.file}` }
+          if (i.file) i.file = await Bot.fileToUrl(i.file, i)
+          i = { type: "text", text: `文件：${i.file}` }
           break
         case "reply":
           reply = i
           continue
         case "markdown":
-          if (typeof i.data.data === "object") i = { type: "markdown", data: i.data.data }
-          else i = { type: "markdown", content: i.data.data }
+          if (typeof i.data === "object") i = { type: "markdown", ...i.data }
+          else i = { type: "markdown", content: i.data }
           break
         case "button":
-          //button.push(...this.makeButtons(data, i.data.data))
+          //button.push(...this.makeButtons(data, i.data))
           continue
         case "node":
-          for (const { message } of i.data.data)
+          for (const { message } of i.data)
             messages.push(...(await this.makeMsg(data, message, true)))
           continue
         case "raw":
-          if (Array.isArray(i.data.data)) {
-            messages.push(i.data.data)
+          if (Array.isArray(i.data)) {
+            messages.push(i.data)
             continue
           }
-          i = i.data.data
+          i = i.data
           break
         default:
-          i = { type: "text", data: {text: Bot.String(i) }}
+          i = { type: "text", text: Bot.String(i) }
       }
 
-      if (i.type === "text" && i.data.text) {
-        const match = i.data.text.match(this.toQRCodeRegExp)
+      if (i.type === "text" && i.text) {
+        const match = i.text.match(this.toQRCodeRegExp)
         if (match)
           for (const url of match) {
             const msg = segment.image(await this.makeQRCode(url))
@@ -593,7 +596,7 @@ const adapter = new (class QQBotAdapter {
               message = []
             }
             message.push(msg)
-            i.data.text = i.data.text.replace(url, "[链接(请扫码查看)]")
+            i.text = i.text.replace(url, "[链接(请扫码查看)]")
           }
       }
 
@@ -610,12 +613,12 @@ const adapter = new (class QQBotAdapter {
         },
       ])
 
-    if (!reply && !nested && data.message_id) reply = { type: "reply", data: {id: data.message_id}}
+    if (!reply && !nested && data.message_id) reply = segment.reply(data.message_id)
     if (reply)
       for (const i of messages)
         i.unshift(
-          reply.data.id.startsWith("event_")
-            ? { type: "reply", data: {event_id: reply.data.id.replace(/^event_/, "") }}
+          reply.id.startsWith("event_")
+            ? { type: "reply", event_id: reply.id.replace(/^event_/, "") }
             : reply,
         )
     return messages
@@ -670,12 +673,12 @@ const adapter = new (class QQBotAdapter {
     let message = [],
       reply
     for (let i of Array.isArray(msg) ? msg : [msg]) {
-      if (typeof i === "object") i = { type: i.type, data: { ...i, type: undefined } }
-      else i = { type: "text", data: { text: Bot.String(i) }}
+      if (typeof i === "object") i = { ...i }
+      else i = { type: "text", text: Bot.String(i) }
 
       switch (i.type) {
         case "at":
-          i.data.user_id = i.data.qq?.replace?.(/^qg_/, "")
+          i.user_id = i.qq?.replace?.(/^qg_/, "")
         case "text":
         case "face":
         case "ark":
@@ -689,42 +692,42 @@ const adapter = new (class QQBotAdapter {
         case "record":
         case "video":
         case "file":
-          if (i.data.file) i.data.file = await Bot.fileToUrl(i.data.file, i)
-          i = { type: "text", text: `文件：${i.data.file}` }
+          if (i.file) i.file = await Bot.fileToUrl(i.file, i)
+          i = { type: "text", text: `文件：${i.file}` }
           break
         case "reply":
           reply = i
           continue
         case "markdown":
-          if (typeof i.data.data === "object") i = { type: "markdown", data: i.data }
-          else i = { type: "markdown", content: i.data.data }
+          if (typeof i.data === "object") i = { type: "markdown", ...i.data }
+          else i = { type: "markdown", content: i.data }
           break
         case "button":
           continue
         case "node":
-          for (const { message } of i.data.data)
+          for (const { message } of i.data)
             messages.push(...(await this.makeGuildMsg(data, message, true)))
           continue
         case "raw":
-          if (Array.isArray(i.data.data)) {
-            messages.push(i.data.data)
+          if (Array.isArray(i.data)) {
+            messages.push(i.data)
             continue
           }
-          i = i.data.data
+          i = i.data
           break
         default:
           i = { type: "text", text: Bot.String(i) }
       }
 
-      if (i.type === "text" && i.data.text) {
-        const match = i.data.text.match(this.toQRCodeRegExp)
+      if (i.type === "text" && i.text) {
+        const match = i.text.match(this.toQRCodeRegExp)
         if (match)
           for (const url of match) {
             const msg = segment.image(await this.makeQRCode(url))
             message.push(msg)
             messages.push(message)
             message = []
-            i.data.text = i.data.text.replace(url, "[链接(请扫码查看)]")
+            i.text = i.text.replace(url, "[链接(请扫码查看)]")
           }
       }
 
@@ -732,12 +735,12 @@ const adapter = new (class QQBotAdapter {
     }
 
     if (message.length) messages.push(message)
-    if (!reply && !nested && data.message_id) reply = { type: "reply", data: {id: data.message_id}}
+    if (!reply && !nested && data.message_id) reply = segment.reply(data.message_id)
     if (reply)
       for (const i of messages)
         i.unshift(
-          reply.data.id.startsWith("event_")
-            ? { type: "reply", data: {event_id: reply.data.id.replace(/^event_/, "") }}
+          reply.id.startsWith("event_")
+            ? { type: "reply", event_id: reply.id.replace(/^event_/, "") }
             : reply,
         )
     return messages
@@ -985,6 +988,7 @@ const adapter = new (class QQBotAdapter {
         },
         msg,
       )
+    data.message.unshift({ type: "at", qq: data.self_id })
     await this.setGroupMap(data)
   }
 
@@ -1088,20 +1092,17 @@ const adapter = new (class QQBotAdapter {
       get user_id() {
         return this.sender.user_id
       },
-      message: [],
+      message: event.message,
       raw_message: event.raw_message,
     }
 
-    for (let i of event.message) {
-      i = { ...i.data, type: i.type }
+    for (const i of data.message)
       switch (i.type) {
         case "at":
           if (data.message_type === "group") i.qq = `${data.self_id}${this.sep}${i.user_id}`
           else i.qq = `qg_${i.user_id}`
           break
       }
-      data.message.push(i)
-    }
 
     switch (data.message_type) {
       case "private":
@@ -1324,7 +1325,10 @@ const adapter = new (class QQBotAdapter {
     token = token.split(":")
     const id = token[0]
     const opts = {
-      mode: ReceiverMode.WEBSOCKET,
+      ...config.bot,
+      appid: token[1],
+      token: token[2],
+      secret: token[3],
       intents: [
         "GUILDS",
         "GUILD_MEMBERS",
@@ -1333,13 +1337,9 @@ const adapter = new (class QQBotAdapter {
         "INTERACTION",
         "MESSAGE_AUDIT",
       ],
-      ...config.bot,
-      appid: token[1],
-      token: token[2],
-      secret: token[3],
     }
 
-    if (+token[4]) opts.intents.push("GROUP_AND_C2C_EVENT")
+    if (+token[4]) opts.intents.push("GROUP_AT_MESSAGE_CREATE", "C2C_MESSAGE_CREATE")
 
     if (+token[5]) opts.intents.push("GUILD_MESSAGES")
     else opts.intents.push("PUBLIC_GUILD_MESSAGES")
@@ -1349,13 +1349,13 @@ const adapter = new (class QQBotAdapter {
       sdk: new QQBot(opts),
       login() {
         return new Promise(resolve => {
-          this.sdk.receiver.once("ready", resolve)
+          this.sdk.sessionManager.once("READY", resolve)
           this.sdk.start()
         })
       },
       logout() {
         return new Promise(resolve => {
-          this.sdk.receiver.once("close", resolve)
+          this.sdk.ws.once("close", resolve)
           this.sdk.stop()
         })
       },
