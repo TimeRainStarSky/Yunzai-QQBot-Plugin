@@ -992,7 +992,8 @@ const adapter = new (class QQBotAdapter {
         },
         msg,
       )
-    data.message.unshift({ type: "at", qq: data.self_id })
+    if (event.event_id?.split(":")[0] === "GROUP_AT_MESSAGE_CREATE")
+      data.message.unshift({ type: "at", qq: data.self_id })
     await this.setGroupMap(data)
   }
 
