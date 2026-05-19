@@ -8,10 +8,13 @@ import { ulid } from "ulid"
 import imageSize from "image-size"
 import urlRegexSafe from "url-regex-safe"
 import { encode as encodeSilk, isSilk } from "silk-wasm"
-import { Bot as QQBot } from "qq-group-bot"
+import QQBot from "qq-group-bot"
 
 import { QQEvent } from "qq-group-bot/lib/event/index.js"
 QQEvent.GROUP_MESSAGE_CREATE = QQEvent.GROUP_AT_MESSAGE_CREATE
+QQBot.Message.parse = eval(
+  `(${QQBot.Message.parse.toString().replace("utils_1", "QQBot").replace("if (type.startsWith('@!'))", "const id=type.slice(type.startsWith('@!')?2:1);const u=payload.mentions.find((u)=>u.id===id);if(u)").replace("payload.mentions.find((u) => u.id === id) || {}", "u")})`,
+)
 
 const { config, configSave } = await makeConfig(
   "QQBot",
@@ -1107,7 +1110,8 @@ const adapter = new (class QQBotAdapter {
     for (const i of data.message)
       switch (i.type) {
         case "at":
-          if (data.message_type === "group") i.qq = `${data.self_id}${this.sep}${i.user_id}`
+          if (data.message_type === "group")
+            i.qq = i.is_you === "true" ? data.self_id : `${data.self_id}${this.sep}${i.user_id}`
           else i.qq = `qg_${i.user_id}`
           break
       }
@@ -1354,7 +1358,7 @@ const adapter = new (class QQBotAdapter {
 
     Bot[id] = {
       adapter: this,
-      sdk: new QQBot(opts),
+      sdk: new QQBot.Bot(opts),
       login() {
         return new Promise(resolve => {
           this.sdk.sessionManager.once("READY", resolve)
