@@ -13,7 +13,7 @@ import QQBot from "qq-group-bot"
 import { QQEvent } from "qq-group-bot/lib/event/index.js"
 QQEvent.GROUP_MESSAGE_CREATE = QQEvent.GROUP_AT_MESSAGE_CREATE
 QQBot.Message.parse = eval(
-  `(${QQBot.Message.parse.toString().replace("utils_1", "QQBot").replace("if (type.startsWith('@!'))", "const id=type.slice(type.startsWith('@!')?2:1);const u=payload.mentions.find((u)=>u.id===id);if(u)").replace("payload.mentions.find((u) => u.id === id) || {}", "u")})`,
+  `(${QQBot.Message.parse.toString().replace("utils_1", "QQBot").replace("if (type.startsWith('@!'))", "const id=type.slice(type.startsWith('@!')?2:1);const u=payload.mentions.find(u=>u.id===id);if(u)").replace("payload.mentions.find((u) => u.id === id) || {}", "u")})`,
 )
 
 const { config, configSave } = await makeConfig(
@@ -100,8 +100,7 @@ const adapter = new (class QQBotAdapter {
     } catch (err) {
       Bot.makeLog("error", ["silk 转码错误", file, err])
     }
-
-    for (const i of [convFile, `${convFile}.pcm`]) fs.unlink(i).catch(() => {})
+    ;[convFile, `${convFile}.pcm`].map(i => Bot.rm(i))
 
     return file
   }
@@ -960,8 +959,12 @@ const adapter = new (class QQBotAdapter {
   }
 
   async makeFriendMessage(data, event) {
+    const user_id = `${data.self_id}${this.sep}${event.sender.user_id}`
     data.sender = {
-      user_id: `${data.self_id}${this.sep}${event.sender.user_id}`,
+      ...data.bot.fl.get(user_id),
+      ...event.sender,
+      user_id,
+      nickname: event.user_name,
     }
     Bot.makeLog("info", `好友消息：[${data.user_id}] ${data.raw_message}`, data.self_id)
 
@@ -977,8 +980,12 @@ const adapter = new (class QQBotAdapter {
   }
 
   async makeGroupMessage(data, event) {
+    const user_id = `${data.self_id}${this.sep}${event.sender.user_id}`
     data.sender = {
-      user_id: `${data.self_id}${this.sep}${event.sender.user_id}`,
+      ...data.bot.fl.get(user_id),
+      ...event.sender,
+      user_id,
+      nickname: event.user_name,
     }
     data.group_id = `${data.self_id}${this.sep}${event.group_id}`
     Bot.makeLog(
@@ -1001,10 +1008,11 @@ const adapter = new (class QQBotAdapter {
   }
 
   async makeDirectMessage(data, event) {
+    const user_id = `qg_${event.sender.user_id}`
     data.sender = {
-      ...data.bot.fl.get(`qg_${event.sender.user_id}`),
+      ...data.bot.fl.get(user_id),
       ...event.sender,
-      user_id: `qg_${event.sender.user_id}`,
+      user_id,
       nickname: event.sender.user_name,
       avatar: event.author.avatar,
       guild_id: event.guild_id,
@@ -1031,11 +1039,12 @@ const adapter = new (class QQBotAdapter {
   }
 
   async makeGuildMessage(data, event) {
+    const user_id = `qg_${event.sender.user_id}`
     data.message_type = "group"
     data.sender = {
-      ...data.bot.fl.get(`qg_${event.sender.user_id}`),
+      ...data.bot.fl.get(user_id),
       ...event.sender,
-      user_id: `qg_${event.sender.user_id}`,
+      user_id,
       nickname: event.sender.user_name,
       card: event.member.nick,
       avatar: event.author.avatar,
